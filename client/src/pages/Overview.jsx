@@ -47,9 +47,9 @@ export default function Overview() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card title={`Today's Classes (${today})`}>
           {todaysClasses.length ? todaysClasses.map((s) => (
-            <div key={s.id} className="flex justify-between border-b border-slate-100 pb-1.5 last:border-0">
+            <div key={s.id} className="flex flex-wrap justify-between gap-x-3 border-b border-slate-100 pb-1.5 last:border-0">
               <span><b>{s.course}</b> · {s.title}</span>
-              <span className="text-slate-500">{s.start_time}–{s.end_time} · {s.room}</span>
+              <span className="text-slate-500 whitespace-nowrap">{s.start_time}–{s.end_time} · {s.room}</span>
             </div>
           )) : <div className="text-slate-400">No classes today</div>}
           {highPriority.length > 0 && (
@@ -58,9 +58,9 @@ export default function Overview() {
         </Card>
         <Card title="Due This Week">
           {dueSoon.length ? dueSoon.map((a) => (
-            <div key={a.id} className="flex justify-between border-b border-slate-100 pb-1.5 last:border-0">
+            <div key={a.id} className="flex flex-wrap justify-between gap-x-3 border-b border-slate-100 pb-1.5 last:border-0">
               <span><b>{a.course}</b> · {a.title}</span>
-              <span className="text-rose-600">{a.deadline}</span>
+              <span className="text-rose-600 whitespace-nowrap">{a.deadline}</span>
             </div>
           )) : <div className="text-slate-400">Nothing due within 7 days.</div>}
         </Card>
@@ -74,9 +74,9 @@ export default function Overview() {
         </Card>
         <Card title="Upcoming Events">
           {upcoming.length ? upcoming.map((e) => (
-            <div key={e.id} className="flex justify-between border-b border-slate-100 pb-1.5 last:border-0">
+            <div key={e.id} className="flex flex-wrap justify-between gap-x-3 border-b border-slate-100 pb-1.5 last:border-0">
               <span>{e.name}</span>
-              <span className="text-slate-500">{e.date} · {e.venue} · {e.registered}/{e.capacity}</span>
+              <span className="text-slate-500 whitespace-nowrap">{e.date} · {e.venue} · {e.registered}/{e.capacity}</span>
             </div>
           )) : <div className="text-slate-400">No upcoming events.</div>}
         </Card>

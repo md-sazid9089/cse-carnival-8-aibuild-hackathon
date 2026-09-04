@@ -58,13 +58,15 @@ export default function ChatPanel({ profile, open = true, onToggle }) {
   }
 
   return (
-    <aside className="w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white flex flex-col h-screen sticky top-0">
+    <aside className="fixed inset-0 z-40 lg:sticky lg:z-auto lg:inset-auto lg:top-0 w-full lg:w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white flex flex-col h-screen">
       <header className="px-4 py-3 border-b border-slate-200 flex items-start justify-between">
         <div>
           <h2 className="font-semibold">CampusOS Assistant</h2>
           <p className="text-xs text-slate-400">Multi-agent · live data · {profile.name}</p>
         </div>
-        <button onClick={onToggle} title="Collapse" className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+        <button onClick={onToggle} title="Collapse" aria-label="Close assistant" className="text-slate-400 hover:text-slate-600 text-xl leading-none p-1">
+          <FiX />
+        </button>
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

@@ -38,9 +38,9 @@ export default function RecordModal({ title, fields, initial, onSubmit, onClose 
         className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
       >
         <h2 className="text-lg font-semibold">{title}</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {fields.map((f) => (
-            <label key={f.key} className={`text-sm ${f.wide ? "col-span-2" : ""}`}>
+            <label key={f.key} className={`text-sm ${f.wide ? "sm:col-span-2" : ""}`}>
               <span className="text-slate-500">{f.label}</span>
               {f.type === "select" ? (
                 <select value={form[f.key] ?? ""} onChange={(e) => set(f.key, e.target.value)} required={!f.optional}

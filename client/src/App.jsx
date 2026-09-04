@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
+import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome, FiMenu, FiMessageCircle, FiX } from "react-icons/fi";
 import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApiProfile, toast } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
@@ -53,7 +53,9 @@ function getRouteFromPath(pathname) {
 export default function App() {
   const [tab, setTab] = useState(() => getRouteFromPath(window.location.pathname));
   const [user, setUser] = useState(getStoredUser);
-  const [chatOpen, setChatOpen] = useState(true);
+  // chat starts closed on small screens so it doesn't cover the dashboard
+  const [chatOpen, setChatOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  const [navOpen, setNavOpen] = useState(false);
 
   const profile = {
     student_id: user?.student_id || (user?.role_id === "student" ? "20-40532" : ""),
@@ -86,6 +88,7 @@ export default function App() {
 
   const navigateTo = (newTab, updateHistory = true) => {
     setTab(newTab);
+    setNavOpen(false);
     if (updateHistory) {
       let targetPath = "/";
       if (newTab === "signin") targetPath = "/auth/signin";
@@ -125,12 +128,21 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      {navOpen && (
+        <div className="fixed inset-0 z-30 bg-slate-900/60 md:hidden" onClick={() => setNavOpen(false)} />
+      )}
       {/* Sidebar Navigation */}
-      <nav className="w-56 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen border-r border-slate-800">
+      <nav className={`fixed inset-y-0 left-0 z-40 w-64 md:w-56 md:sticky md:z-auto md:translate-x-0 shrink-0 bg-slate-900 text-slate-300 flex flex-col top-0 h-screen border-r border-slate-800 transition-transform duration-200 ${
+        navOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="px-4 py-5 border-b border-slate-800">
           <div className="flex items-center justify-between">
             <h1 className="text-white font-bold text-lg tracking-tight">CampusOS</h1>
-            <span className="text-[10px] bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.5 rounded font-mono">v1.0</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.5 rounded font-mono">v1.0</span>
+              <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="md:hidden text-slate-400 hover:text-white">
+                <FiX />
+              </button>
+            </div>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">AUST · AI University Platform</p>
         </div>
@@ -202,16 +214,20 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm font-medium text-slate-500">
+        <header className="bg-white border-b border-slate-200 px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sticky top-0 z-10 shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button onClick={() => setNavOpen(true)} aria-label="Open menu"
+                    className="md:hidden shrink-0 p-1.5 rounded-lg text-slate-600 hover:bg-slate-100">
+              <FiMenu className="text-xl" />
+            </button>
+            <span className="hidden sm:inline text-sm font-medium text-slate-500">
               Active Context:
             </span>
             <span className="text-sm font-semibold text-slate-900 truncate">
               {user?.name}
             </span>
             <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
+              className={`hidden sm:inline text-xs px-2.5 py-0.5 rounded-full font-medium border whitespace-nowrap ${
                 isAuthority
                   ? "bg-purple-100 text-purple-800 border-purple-300 font-semibold"
                   : user?.role_id === "teacher"
@@ -223,8 +239,8 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="hidden lg:flex items-center gap-2">
               <a
                 href="/auth/signin"
                 onClick={(e) => { e.preventDefault(); navigateTo("signin"); }}
@@ -243,20 +259,19 @@ export default function App() {
 
             <button
               onClick={() => setChatOpen((o) => !o)}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
             >
-              {chatOpen ? "Hide Assistant" : "💬 AI Assistant"}
+              <FiMessageCircle /> <span className="hidden sm:inline">{chatOpen ? "Hide Assistant" : "AI Assistant"}</span>
             </button>
           </div>
         </header>
 
         {/* Authority Full Access Banner */}
         {isAuthority && (
-          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-purple-100 px-6 py-2.5 text-xs flex items-center justify-between shadow-inner border-b border-purple-700">
-            <div className="flex items-center gap-2">
-              <span className="text-base">👑</span>
-              <span className="font-semibold">Authority Mode Active:</span>
-              <span>Full administrative CRUD permissions enabled across all campus schedules, rooms, events, announcements, and booking overrides.</span>
+          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-purple-100 px-3 sm:px-6 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-inner border-b border-purple-700">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold shrink-0">Authority Mode Active:</span>
+              <span className="hidden md:inline">Full administrative CRUD permissions enabled across all campus schedules, rooms, events, announcements, and booking overrides.</span>
             </div>
             <span className="bg-purple-800/80 text-purple-200 border border-purple-600/60 px-2 py-0.5 rounded text-[10px] font-mono">
               ROLE: AUTHORITY
@@ -264,7 +279,7 @@ export default function App() {
           </div>
         )}
 
-        <main className="flex-1 p-6 overflow-x-auto">
+        <main className="flex-1 p-3 sm:p-6 overflow-x-auto">
           {tab === "overview" && <Overview />}
           {tab === "schedules" && <ResourcePage entity="schedules" config={entities.schedules} />}
           {tab === "rooms" && <Rooms user={user} profile={profile} />}
