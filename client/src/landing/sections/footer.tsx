@@ -5,11 +5,11 @@ import { scrollToHash } from "../hooks/use-navigate";
 
 export function Footer() {
   return (
-    <footer className="border-t border-cream-200 bg-cream-50 py-12 text-forest-deep">
+    <footer className="border-t border-line bg-canvas py-12 text-ink">
       <Container className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
         <div className="max-w-sm">
           <Logo />
-          <p className="mt-4 text-sm leading-relaxed text-ink-muted">
+          <p className="mt-4 text-sm leading-relaxed text-ink-2">
             Intelligent campus infrastructure for the next generation of students — made only for Ahsanullah University
             of Science and Technology (AUST), for holders of an @aust.edu account.
           </p>
@@ -24,7 +24,7 @@ export function Footer() {
                     href={l.href}
                     onClick={isHash ? (e) => { e.preventDefault(); scrollToHash(l.href); } : undefined}
                     {...("external" in l && l.external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
-                    className="rounded text-forest transition-colors hover:text-terracotta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta"
+                    className="rounded text-ink-2 transition-colors hover:text-accent"
                   >
                     {l.label}
                   </a>
@@ -34,8 +34,8 @@ export function Footer() {
           </ul>
         </nav>
       </Container>
-      <Container className="mt-10 border-t border-cream-200 pt-6">
-        <p className="text-xs text-ink-muted">© 2026 CampusOS. Built for the AI Build Hackathon.</p>
+      <Container className="mt-10 border-t border-line pt-6">
+        <p className="text-xs text-ink-3">© 2026 CampusOS. Built for the AI Build Hackathon.</p>
       </Container>
     </footer>
   );

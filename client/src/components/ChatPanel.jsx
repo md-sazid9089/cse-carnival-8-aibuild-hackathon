@@ -379,7 +379,9 @@ export default function ChatPanel({ open, onClose }) {
                       ? "rounded-br-md bg-ink text-ink-invert"
                       : message.agent === "error"
                         ? "rounded-bl-md border border-critical/30 bg-critical-soft text-ink"
-                        : "rounded-bl-md bg-surface-3 text-ink",
+                        : message.agent === "degraded"
+                          ? "rounded-bl-md border border-caution/30 bg-caution-soft text-ink"
+                          : "rounded-bl-md bg-surface-3 text-ink",
                   )}
                 >
                   {message.agent === "error" ? (

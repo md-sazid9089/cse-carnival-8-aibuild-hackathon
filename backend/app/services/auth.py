@@ -13,14 +13,17 @@ from .common import DomainError
 
 ITERATIONS = 100_000
 
-# AUST issues exactly one address per student — `<department>.<student id>@aust.edu` — so the
+# AUST issues exactly one address per student — `<name>.<department>.<student id>@aust.edu` — so the
 # address is the record: both the ID and the department are read from it, never typed by hand.
 _DOMAIN = re.escape(EMAIL_DOMAIN)
 CAMPUS_DOMAIN_RE = re.compile(rf"^[^@\s]+@(?:[a-z0-9-]+\.)*{_DOMAIN}$")
 CAMPUS_EMAIL_RE = re.compile(
-    rf"^(?P<department>[a-z]{{2,10}})\.(?P<student_id>\d[a-z0-9-]{{3,19}})@(?:[a-z0-9-]+\.)*{_DOMAIN}$"
+    rf"^(?P<name>[a-z][a-z.-]*)\.(?P<department>[a-z]{{2,10}})\.(?P<student_id>\d[\d-]{{3,19}})"
+    rf"@(?:[a-z0-9-]+\.)*{_DOMAIN}$"
 )
-CAMPUS_EMAIL_HINT = f"department.studentid@{EMAIL_DOMAIN} (for example cse.20250999@{EMAIL_DOMAIN})"
+CAMPUS_EMAIL_HINT = (
+    f"name.department.studentid@{EMAIL_DOMAIN} (for example tayeb.cse.20230104027@{EMAIL_DOMAIN})"
+)
 CAMPUS_ONLY_MESSAGE = f"CampusOS is for AUST students only — use your @{EMAIL_DOMAIN} email address"
 
 

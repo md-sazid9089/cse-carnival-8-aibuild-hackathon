@@ -13,12 +13,12 @@ function Network() {
   ];
   const edges: Array<[number, number]> = [[0, 6], [6, 1], [1, 5], [5, 2], [2, 4], [5, 3], [3, 4], [0, 2]];
   return (
-    <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full opacity-40">
+    <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full text-brand-panel-ink/40">
       {edges.map(([a, b], i) => (
         <motion.line
           key={i}
           x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]}
-          stroke="#A9B8AC" strokeWidth="0.25" vectorEffect="non-scaling-stroke"
+          stroke="currentColor" strokeWidth="0.25" vectorEffect="non-scaling-stroke"
           initial={{ pathLength: 0, opacity: 0 }}
           whileInView={{ pathLength: 1, opacity: 1 }}
           viewport={{ once: true }}
@@ -28,7 +28,7 @@ function Network() {
       {nodes.map(([x, y], i) => (
         <motion.circle
           key={i} cx={x} cy={y} r="0.9"
-          fill={i === 5 ? "#B97861" : "#A9B8AC"}
+          fill={i === 5 ? "var(--accent)" : "currentColor"}
           initial={{ scale: 0, opacity: 0 }}
           whileInView={{ scale: 1, opacity: 1 }}
           viewport={{ once: true }}
@@ -43,19 +43,19 @@ function Network() {
 export function FinalCta() {
   const navigate = useNavigate();
   return (
-    <section className="bg-cream-50 px-5 pb-20 sm:px-8 sm:pb-28">
+    <section className="bg-canvas px-5 pb-20 sm:px-8 sm:pb-28">
       <Container>
-        <Reveal className="relative overflow-hidden rounded-[2rem] bg-forest-deep px-6 py-16 text-center text-cream-50 shadow-lift sm:px-12 sm:py-24">
+        <Reveal className="relative overflow-hidden rounded-2xl bg-brand-panel px-6 py-16 text-center text-brand-panel-ink shadow-lg sm:px-12 sm:py-24">
           <Network />
-          <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-terracotta/20 blur-3xl" />
-          <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-16 size-80 rounded-full bg-sage/15 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 size-72 rounded-full bg-accent/20 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -right-16 -bottom-32 size-80 rounded-full bg-white/5 blur-3xl" />
 
           <div className="relative mx-auto max-w-2xl">
-            <h2 className="font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+            <h2 className="text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
               Your campus is already full of information.
-              <span className="mt-2 block text-peach">Make it intelligent.</span>
+              <span className="mt-2 block text-accent">Make it intelligent.</span>
             </h2>
-            <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-sage sm:text-lg">
+            <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-brand-panel-ink/70 sm:text-lg">
               One platform for campus data. One AI agent for everything you need to know and do — exclusively for AUST
               students, with your @aust.edu account.
             </p>

@@ -90,9 +90,9 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.48 }}
-            className="mt-3 text-sm text-ink-muted"
+            className="mt-3 text-sm text-ink-2"
           >
-            AUST students only — sign in with your <span className="font-semibold text-forest-deep">@aust.edu</span>{" "}
+            AUST students only — sign in with your <span className="font-semibold text-ink">@aust.edu</span>{" "}
             email.
           </motion.p>
         </div>

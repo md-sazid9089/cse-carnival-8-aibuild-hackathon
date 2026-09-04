@@ -27,6 +27,7 @@ MAX_THROTTLE_WAIT_S = 8.0
 # A 429 means one of three different things; only an account-level cap should cost a key for the day.
 KEY_DAILY_RE = re.compile(r"per[\s-]?day|daily limit|free-models-per-day|add (more )?credits|"
                           r"insufficient credits|quota exceeded", re.I)
+KEY_MINUTE_RE = re.compile(r"per[\s-]?(minute|second|hour)|requests? per\b", re.I)
 UPSTREAM_RE = re.compile(r"upstream|provider returned error|temporarily rate.?limited", re.I)
 
 
@@ -223,6 +224,9 @@ class Gateway:
         detail = _error_detail(res)
         if KEY_DAILY_RE.search(detail):
             ks.note_429(retry_after, daily=True)
+            return
+        if KEY_MINUTE_RE.search(detail):
+            ks.note_429(retry_after)
             return
         if UPSTREAM_RE.search(detail) or (retry_after is not None and retry_after <= 60):
             self.breakers.setdefault(model, Breaker()).park(min(max(retry_after or 5.0, 2.0), 60.0))

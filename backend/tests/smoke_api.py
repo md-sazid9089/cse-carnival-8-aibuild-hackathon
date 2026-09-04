@@ -29,7 +29,7 @@ def j(r):
 def register(label: str) -> dict:
     """A throwaway account: the API only accepts identities it signed itself."""
     suffix = f"{uuid.uuid4().int % 10**10:010d}"
-    r = c.post("/api/auth/signup", json={"name": f"Smoke {label}", "email": f"cse.{suffix}@aust.edu",
+    r = c.post("/api/auth/signup", json={"name": f"Smoke {label}", "email": f"smoke.cse.{suffix}@aust.edu",
                                          "password": f"pw-{suffix}"})
     if r.status_code != 200:
         print(f"FATAL: could not create the {label} test account: {j(r)}")

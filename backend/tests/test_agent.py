@@ -20,7 +20,7 @@ from app import config  # noqa: E402
 from app.agents import degraded, store, tools  # noqa: E402
 from app.agents.agent import run_turn  # noqa: E402
 from app.agents.gateway import Gateway, LLMError  # noqa: E402
-from app.db import execute, migrate, q1  # noqa: E402
+from app.db import execute, migrate, q, q1  # noqa: E402
 from app.services import events, rooms  # noqa: E402
 from app.services.common import DomainError, parse_time  # noqa: E402
 
@@ -159,6 +159,19 @@ out = run(gw.complete([{"role": "user", "content": "x"}]))
 check("gateway: daily cap 429 parks the key and cycles",
       out["message"]["content"] == "other key" and not gw.keys[0].available(),
       [k.limit_status() for k in gw.keys])
+
+# OpenRouter sends x-ratelimit-reset as an absolute epoch in MILLISECONDS. Read as a delta it looked
+# like "retry in 57 years", which parked a healthy key for the rest of the day on a one-minute limit.
+gw, fake = make_gateway([(429, {"error": {"message": "Rate limit exceeded: 20 requests per minute"}},
+                          {"x-ratelimit-reset": str(int((time.time() + 30) * 1000))}),
+                         (200, _msg("other key"))])
+out = run(gw.complete([{"role": "user", "content": "x"}]))
+cooldown = gw.keys[0].blocked_until - time.monotonic()
+check("gateway: per-minute 429 is a short key cooldown, never a day-long park",
+      out["message"]["content"] == "other key" and gw.keys[0].exhausted_day is None and cooldown < 120,
+      (cooldown, [k.limit_status() for k in gw.keys]))
+check("gateway: a per-minute 429 does not park the model for other keys",
+      gw.breakers["model-a"].closed() and fake.calls[1][1] == "model-a", fake.calls)
 
 gw, fake = make_gateway([(401, {"error": {"message": "bad key"}}), (200, _msg("ok"))])
 out = run(gw.complete([{"role": "user", "content": "x"}]))
@@ -359,6 +372,23 @@ check("degraded uses the weekday in the question, not today",
 out = degraded.answer("Show me all high priority announcements.", PROFILE)
 check("degraded filters announcements by the requested priority",
       out is not None and "[medium]" not in out["reply"] and "[low]" not in out["reply"], out)
+
+# Judges edit a record mid-evaluation and ask about it, so the edited FIELD has to be in the answer:
+# a template that prints titles or room numbers only hides the change it is supposed to prove.
+bodies = [" ".join(str(r["body"]).split())[:30] for r in q("SELECT body FROM announcements")]
+out = degraded.answer("what are the latest announcements?", PROFILE)
+check("degraded shows announcement bodies, not just titles",
+      out is not None and any(b and b in out["reply"] for b in bodies), out)
+out = degraded.answer("which labs have computers?", PROFILE)
+check("degraded room answers carry capacity and equipment",
+      out is not None and "seats" in out["reply"] and "computers" in out["reply"], out)
+out = degraded.answer("which rooms fit at least 45 people?", PROFILE)
+check("degraded honours a capacity asked for in the question",
+      out is not None and "seats 30" not in out["reply"] and "seats 4" in out["reply"], out)
+out = degraded.answer("I'm free until 2 PM - is there anything on campus?", PROFILE)
+check("degraded answers a free-time question from events", out is not None and "\u2022" in out["reply"], out)
+check("degraded answers say they are templated, not the model's own words",
+      out is not None and out["reply"].startswith("**"), out)
 
 # ---------------------------------------------------------------- agent loop
 import app.agents.agent as agent_mod  # noqa: E402

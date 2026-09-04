@@ -38,7 +38,7 @@ with TestClient(app) as client:
 
     # 2. Register, then sign in with those credentials
     stamp = int(time.time())
-    owner_email, owner_password = f"cse.{stamp}01@aust.edu", f"owner-pw-{stamp}"
+    owner_email, owner_password = f"owner.cse.{stamp}01@aust.edu", f"owner-pw-{stamp}"
     r = client.post("/api/auth/signup", json={"name": "Owner Student", "email": owner_email,
                                               "password": owner_password})
     check("Sign up -> 200", r.status_code == 200, r.json() if r.status_code != 200 else "ok")
@@ -49,12 +49,12 @@ with TestClient(app) as client:
     check("Department is read from the AUST email", owner.get("department") == "CSE", owner.get("department"))
 
     # 2b. CampusOS is for AUST students only
-    r_outside = client.post("/api/auth/signup", json={"name": "Outsider", "email": f"cse.{stamp}03@gmail.com",
+    r_outside = client.post("/api/auth/signup", json={"name": "Outsider", "email": f"out.cse.{stamp}03@gmail.com",
                                                       "password": owner_password})
     check("Sign up with a non-AUST email -> 400", r_outside.status_code == 400, r_outside.json())
     r_shape = client.post("/api/auth/signup", json={"name": "Wrong Shape", "email": f"student{stamp}@aust.edu",
                                                     "password": owner_password})
-    check("AUST email must be dept.id@aust.edu -> 400", r_shape.status_code == 400, r_shape.json())
+    check("AUST email must be name.dept.id@aust.edu -> 400", r_shape.status_code == 400, r_shape.json())
     check("Sign in with a non-AUST email -> 400",
           client.post("/api/auth/signin",
                       json={"email_or_id": "someone@gmail.com", "password": "x"}).status_code == 400)
@@ -82,7 +82,7 @@ with TestClient(app) as client:
           client.post("/api/auth/signin", json={"email_or_id": "nobody@aust.edu", "password": "x"}).status_code == 401)
 
     # A second account so ownership can be tested from the other side
-    other_email, other_password = f"eee.{stamp}02@aust.edu", f"other-pw-{stamp}"
+    other_email, other_password = f"other.eee.{stamp}02@aust.edu", f"other-pw-{stamp}"
     r = client.post("/api/auth/signup", json={"name": "Other Student", "email": other_email,
                                               "password": other_password})
     other_token = r.json().get("token")
