@@ -6,10 +6,10 @@ These rules apply to EVERY AI coding agent working in this repository (GitHub Co
 
 Before making ANY implementation change, read — in full — the documents relevant to the task:
 
-| Always                                                      | When touching                                                           |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `PROBLEM_STATEMENT.md` (requirements + scoring rubric)      | `schema/schema.md` — any data model, service, migration, or form change |
-| `docs/ARCHITECTURE.md` (every design decision + why)        | `sample_queries/sample_queries.md` — any agent/prompt/tool change       |
+| Always                                                           | When touching                                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `PROBLEM_STATEMENT.md` (requirements + scoring rubric)           | `schema/schema.md` — any data model, service, migration, or form change |
+| `docs/ARCHITECTURE.md` (every design decision + why)             | `sample_queries/sample_queries.md` — any agent/prompt/tool change       |
 | `docs/TEAM_PLAN.md` (ownership — don't step on teammates' areas) | `SUBMISSION.md` — README, env, deployment, or submission work           |
 
 Do not begin editing until you can state which rubric line (R1–R13 in `docs/ARCHITECTURE.md`) the change serves. If the docs and the code disagree, the docs describe intent — flag the discrepancy, then fix whichever is wrong.
