@@ -75,7 +75,7 @@ export default function SignUp({ onNavigate, onSuccess }) {
           <div className="flex items-center justify-between border-b border-slate-700 pb-3.5 mb-5">
             <div>
               <h2 className="text-lg font-semibold text-white">Create Student Account</h2>
-              <p className="text-xs text-slate-400">Standard Student Role Provisioning</p>
+              <p className="text-xs text-slate-400">Full Access Student Role Provisioning</p>
             </div>
             <button
               type="button"
@@ -87,12 +87,12 @@ export default function SignUp({ onNavigate, onSuccess }) {
           </div>
 
           {/* Student Role Notice */}
-          <div className="mb-5 rounded-lg bg-blue-950/60 border border-blue-600/40 p-3 text-xs text-blue-200">
-            <div className="flex items-center gap-1.5 font-semibold text-blue-300 mb-1">
-              <span>ℹ️</span> Initial Role: Student
+          <div className="mb-5 rounded-lg bg-indigo-950/60 border border-indigo-600/40 p-3 text-xs text-indigo-200">
+            <div className="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1">
+              <span>🎓</span> Role: Student (Full Access)
             </div>
-            <p className="text-blue-300/80">
-              New signups are automatically assigned the <b>Student</b> role with course routines, room booking, event registrations, and AI assistance.
+            <p className="text-indigo-300/80">
+              New signups are assigned the <b>Student</b> role with complete access across course routines, room management, event registrations, announcements, and AI assistance.
             </p>
           </div>
 

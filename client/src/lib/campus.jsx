@@ -39,7 +39,7 @@ export function CampusProvider({ children }) {
     () => ({
       student_id: account?.student_id ?? "",
       name: account?.name ?? "",
-      role: account?.role_id ?? "",
+      role: account?.role_id ?? "student",
     }),
     [account],
   );
@@ -49,7 +49,7 @@ export function CampusProvider({ children }) {
     return {
       profile,
       account,
-      isTeacher: account?.role_id === "teacher",
+      isTeacher: false,
       signOut: clearAuth,
       // Server clock (campus timezone) with a local fallback so the UI still renders offline.
       today: meta.data?.today ?? toIso(local),

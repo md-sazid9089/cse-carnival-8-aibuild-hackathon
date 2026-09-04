@@ -3,28 +3,28 @@ import { api, setAuth, toast } from "../api.js";
 
 const DEMO_ACCOUNTS = [
   {
-    role: "Authority",
-    label: "👑 Campus Admin (Authority · Full Access)",
-    email: "admin@aust.edu",
-    password: "admin@aust2026",
-    badgeCls: "bg-purple-100 text-purple-800 border-purple-200",
-    desc: "Unrestricted full access across the entire campus platform",
+    role: "Student",
+    label: "🎓 Sakibul Hassan (Student · Full Access)",
+    email: "sakibul.hassan@aust.edu",
+    password: "student123",
+    badgeCls: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    desc: "Enrolled student profile with full access across all campus systems",
   },
   {
     role: "Student",
-    label: "🎓 Sakibul Hassan (Student · Initial Role)",
-    email: "sakibul.hassan@aust.edu",
+    label: "🎓 QA Tester (Student · Full Access)",
+    email: "qa.tester@aust.edu",
     password: "student123",
     badgeCls: "bg-blue-100 text-blue-800 border-blue-200",
-    desc: "Standard student role with routine, booking & event features",
+    desc: "Test student profile with full access to schedules, rooms, events & notices",
   },
   {
-    role: "Teacher",
-    label: "👨‍🏫 Prof. Dr. Shahriar (Teacher)",
-    email: "shahriar.mahbub@aust.edu",
-    password: "teacher123",
-    badgeCls: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    desc: "Academic faculty member with scheduling & grading rights",
+    role: "Student",
+    label: "🎓 Tanvir Ahmed (Student · Full Access)",
+    email: "tanvir.ahmed@aust.edu",
+    password: "student123",
+    badgeCls: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    desc: "Student profile with complete room booking and registration rights",
   },
 ];
 
@@ -47,7 +47,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
     try {
       const res = await api.signin({ email_or_id: ident.trim(), password });
       setAuth(res.user, res.token);
-      toast(`Welcome back, ${res.user.name}! (Role: ${res.user.role_id.toUpperCase()})`, "success");
+      toast(`Welcome back, ${res.user.name}!`, "success");
       if (onSuccess) onSuccess(res.user);
       else if (onNavigate) onNavigate("overview");
     } catch (err) {

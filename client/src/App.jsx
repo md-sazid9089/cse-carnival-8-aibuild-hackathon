@@ -80,7 +80,7 @@ function AccountCard() {
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
           <span className="block truncate text-[11px] text-ink-3 tabular">
-            {account?.student_id || account?.employee_id || account?.role_id}
+            {account?.student_id ? `ID: ${account.student_id}` : "Student (Full Access)"}
           </span>
         </span>
       </div>

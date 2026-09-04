@@ -72,9 +72,19 @@ def parse_token(token: str) -> dict | None:
         return None
 
 
-def get_user_permissions(role_id: str) -> list[str]:
-    rows = q("SELECT permission_id FROM role_permissions WHERE role_id = %s", [role_id])
-    return [r["permission_id"] for r in rows]
+def get_user_permissions(role_id: str = "student") -> list[str]:
+    """Every student has full access across all systems per PROBLEM_STATEMENT.md."""
+    rows = q("SELECT id FROM permissions")
+    if rows:
+        return [r["id"] for r in rows]
+    return [
+        "schedules:view", "schedules:manage",
+        "rooms:view", "rooms:book", "rooms:cancel_own", "rooms:manage", "rooms:override_bookings",
+        "events:view", "events:register", "events:cancel_own", "events:manage",
+        "announcements:view", "announcements:create", "announcements:manage",
+        "assignments:view", "assignments:submit", "assignments:manage", "assignments:grade",
+        "users:manage", "logs:view",
+    ]
 
 
 def sign_up(name: str, email: str, password: str, student_id: str | None = None, department: str = "CSE") -> dict:

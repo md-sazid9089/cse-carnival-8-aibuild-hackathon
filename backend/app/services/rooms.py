@@ -163,11 +163,11 @@ def next_id_booking() -> str:
     return f"bk-{row['n']:03d}"
 
 
-def cancel_booking(booking_id: str, requested_by: str, is_authority: bool = False) -> dict:
+def cancel_booking(booking_id: str, requested_by: str | None = None, full_access: bool = True) -> dict:
     b = q1("SELECT * FROM bookings WHERE booking_id = %s", [booking_id])
     if not b:
         raise DomainError("NOT_FOUND", f"Booking {booking_id} not found", 404)
-    if not is_authority and b["booked_by"] != requested_by:
+    if not full_access and requested_by and b["booked_by"] != requested_by:
         raise DomainError("FORBIDDEN", f"Booking {booking_id} was made by {b['booked_by']}; you can only cancel your own bookings", 403)
     execute("DELETE FROM bookings WHERE booking_id = %s", [booking_id])
     sse.publish("rooms", "update", b["room_id"])
