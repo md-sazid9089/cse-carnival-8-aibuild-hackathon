@@ -7,7 +7,6 @@ venv/
 env/
 
 # Environment
-.env
 *.env.local
 
 # Build outputs

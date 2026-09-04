@@ -4,7 +4,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
+# Load .env from workspace root or backend directory
 load_dotenv(ROOT / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://campusos:campusos@localhost:5433/campusos")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
