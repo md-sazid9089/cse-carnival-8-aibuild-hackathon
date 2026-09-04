@@ -3,8 +3,9 @@ import ChatPanel, { AssistantFab } from "./components/ChatPanel.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import ConfirmHost from "./components/ConfirmDialog.jsx";
 import Toast from "./components/Toast.jsx";
-import { Button, IconButton, Kbd, Select } from "./components/ui.jsx";import { useMediaQuery, useTheme } from "./hooks.js";
-import { CampusProvider, PROFILES, useCampus } from "./lib/campus.jsx";
+import { Button, IconButton, Kbd } from "./components/ui.jsx";
+import { useMediaQuery, useTheme } from "./hooks.js";
+import { CampusProvider, useCampus } from "./lib/campus.jsx";
 import { useFocusTrap } from "./lib/focus.js";
 import { cx, initials } from "./lib/format.js";
 import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
@@ -68,8 +69,8 @@ function NavList({ tab, onSelect }) {
   );
 }
 
-function ProfileSwitcher({ onSignIn }) {
-  const { profile, setProfile, account, signOut } = useCampus();
+function AccountCard() {
+  const { profile, account, signOut } = useCampus();
   return (
     <div className="rounded-xl border border-line bg-surface-2 p-2.5">
       <div className="mb-2 flex items-center gap-2.5">
@@ -78,37 +79,14 @@ function ProfileSwitcher({ onSignIn }) {
         </span>
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
-          <span className="block text-[11px] text-ink-3 tabular">
-            {account ? account.role_id : profile.student_id}
+          <span className="block truncate text-[11px] text-ink-3 tabular">
+            {account?.student_id || account?.employee_id || account?.role_id}
           </span>
         </span>
       </div>
-      {account ? (
-        <Button size="sm" variant="ghost" className="w-full" onClick={signOut}>
-          Sign out
-        </Button>
-      ) : (
-        <>
-          <label htmlFor="profile-switcher" className="sr-only">
-            Acting as
-          </label>
-          <Select
-            id="profile-switcher"
-            value={profile.student_id}
-            onChange={(event) => setProfile(PROFILES.find((p) => p.student_id === event.target.value))}
-            className="h-8 text-[13px] normal-case"
-          >
-            {PROFILES.map((p) => (
-              <option key={p.student_id} value={p.student_id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-          <Button size="sm" variant="ghost" className="mt-1.5 w-full" onClick={onSignIn}>
-            Sign in
-          </Button>
-        </>
-      )}
+      <Button size="sm" variant="ghost" className="w-full" onClick={signOut}>
+        Sign out
+      </Button>
     </div>
   );
 }
@@ -118,7 +96,8 @@ function Shell() {
   const [navQuery, setNavQuery] = useState("");
   const [navKey, setNavKey] = useState(0);
   const [drawer, setDrawer] = useState(false);
-  const [palette, setPalette] = useState(false);  const [authView, setAuthView] = useState(null);  const isWide = useMediaQuery("(min-width: 1280px)");
+  const [palette, setPalette] = useState(false);
+  const isWide = useMediaQuery("(min-width: 1280px)");
   const [chatOpen, setChatOpen] = useState(isWide);
   const { theme, toggle } = useTheme();
   const drawerRef = useRef(null);
@@ -160,18 +139,6 @@ function Shell() {
     assignments: <Assignments initialQuery={navQuery} />,
   };
 
-  // Signing in is optional: the dashboard is fully usable with the demo profiles.
-  if (authView) {
-    const goto = (target) => setAuthView(target === "signin" || target === "signup" ? target : null);
-    const Page = authView === "signup" ? SignUp : SignIn;
-    return (
-      <>
-        <Page onNavigate={goto} onSuccess={() => setAuthView(null)} />
-        <Toast />
-      </>
-    );
-  }
-
   return (
     <div className="flex min-h-screen bg-canvas">
       <a
@@ -200,7 +167,7 @@ function Shell() {
               <Kbd>K</Kbd>
             </span>
           </button>
-          <ProfileSwitcher onSignIn={() => setAuthView("signin")} />
+          <AccountCard />
         </div>
       </aside>
 
@@ -221,7 +188,7 @@ function Shell() {
             </div>
             <NavList tab={tab} onSelect={navigate} />
             <div className="mt-auto pt-4">
-              <ProfileSwitcher onSignIn={() => setAuthView("signin")} />
+              <AccountCard />
             </div>
           </div>
         </div>
@@ -269,10 +236,26 @@ function Shell() {
   );
 }
 
+/** Nothing is readable without an identity: the whole dashboard is scoped to the signed-in account. */
+function Gate() {
+  const { account } = useCampus();
+  const [view, setView] = useState("signin");
+
+  if (account) return <Shell />;
+
+  const Page = view === "signup" ? SignUp : SignIn;
+  return (
+    <>
+      <Page onNavigate={(target) => setView(target === "signup" ? "signup" : "signin")} onSuccess={() => setView("signin")} />
+      <Toast />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <CampusProvider>
-      <Shell />
+      <Gate />
     </CampusProvider>
   );
 }

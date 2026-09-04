@@ -261,7 +261,10 @@ export default function ChatPanel({ open, onClose }) {
         },
         body: JSON.stringify({ message: content, conversation_id: conversationRef.current }),
       });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok || !res.body) {
+        const problem = await res.json().catch(() => null);
+        throw new Error(problem?.detail ?? `The assistant is unavailable (HTTP ${res.status}).`);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

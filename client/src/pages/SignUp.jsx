@@ -211,10 +211,10 @@ export default function SignUp({ onNavigate, onSuccess }) {
           <div className="mt-5 text-center">
             <button
               type="button"
-              onClick={() => onNavigate && onNavigate("overview")}
+              onClick={() => onNavigate && onNavigate("signin")}
               className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
             >
-              ← Back to CampusOS Dashboard
+              ← Back to sign in
             </button>
           </div>
         </div>

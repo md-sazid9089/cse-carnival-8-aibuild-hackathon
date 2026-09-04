@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "../api.js";
 import DataTable from "../components/DataTable.jsx";
-import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, Toolbar } from "../components/page.jsx";
+import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, StaleNotice, Toolbar } from "../components/page.jsx";
 import RecordModal from "../components/RecordModal.jsx";
 import { Badge, Button, Card, EmptyState, IconButton, Segmented, Skeleton, StatusBadge } from "../components/ui.jsx";
 import { entities } from "../entities.jsx";
@@ -83,7 +83,7 @@ function AssignmentRow({ assignment, today, onEdit, onDelete, onSubmit, busy }) 
 }
 
 export default function Assignments({ initialQuery = "" }) {
-  const { data, error, loading, refreshing, refresh } = useApi(config.endpoint);
+  const { data, error, staleError, loading, refreshing, refresh } = useApi(config.endpoint);
   const { today } = useCampus();
   const [view, setView] = useState("board");
   const [query, setQuery] = useState(initialQuery);
@@ -104,7 +104,7 @@ export default function Assignments({ initialQuery = "" }) {
         if (!needle) return true;
         return config.searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(needle));
       })
-      .sort((a, b) => a.deadline.localeCompare(b.deadline));
+      .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)));
   }, [data, search, status]);
 
   const grouped = useMemo(() => {
@@ -122,7 +122,7 @@ export default function Assignments({ initialQuery = "" }) {
     setPending(null);
   };
 
-  const { sorted, sort, toggle } = useSort(filtered);
+  const { sorted, sort, toggle } = useSort(filtered, null, config.columns);
 
   return (
     <div className="animate-fade-in">
@@ -156,12 +156,15 @@ export default function Assignments({ initialQuery = "" }) {
           <SearchInput value={query} onChange={setQuery} placeholder="Search assignments" id="search-assignments" />
           <FilterSelect
             label="Status"
+            allLabel="Any status"
             options={["pending", "submitted", "graded", "late"]}
             value={status}
             onChange={setStatus}
           />
         </Toolbar>
       </PageHeader>
+
+      <StaleNotice message={staleError} onRetry={refresh} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
@@ -220,6 +223,7 @@ export default function Assignments({ initialQuery = "" }) {
         <DataTable
           columns={config.columns}
           rows={sorted}
+          label="Assignments"
           sort={sort}
           onSort={toggle}
           onEdit={crud.openEdit}
@@ -231,9 +235,10 @@ export default function Assignments({ initialQuery = "" }) {
       {crud.modal ? (
         <RecordModal
           title={crud.modal.mode === "edit" ? "Edit assignment" : "New assignment"}
-          description={crud.modal.mode === "edit" ? crud.modal.row.id : undefined}
+          recordKey={`assignment-${crud.modal.mode}-${crud.modal.row?.id ?? "new"}`}
+          description={crud.modal.row ? `${crud.modal.row.course} · due ${fmtDate(crud.modal.row.deadline)}` : undefined}
           fields={config.fields}
-          initial={crud.modal.row ?? { assigned_date: today, marks: 0 }}
+          initial={crud.modal.row ?? { assigned_date: today }}
           submitLabel={crud.modal.mode === "edit" ? "Save changes" : "Add assignment"}
           onSubmit={crud.save}
           onClose={crud.close}

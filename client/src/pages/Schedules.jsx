@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import DataTable from "../components/DataTable.jsx";
-import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, Toolbar } from "../components/page.jsx";
+import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, StaleNotice, Toolbar } from "../components/page.jsx";
 import RecordModal from "../components/RecordModal.jsx";
 import { Button, EmptyState, Segmented, Skeleton } from "../components/ui.jsx";
 import { DAYS, entities } from "../entities.jsx";
@@ -52,12 +52,12 @@ function ClassCard({ row, isNow, onEdit, onDelete }) {
         type="button"
         onClick={() => onDelete(row)}
         aria-label={`Delete ${row.course} on ${row.day}`}
-        className="absolute top-2 right-2 grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-critical-soft hover:text-critical focus-visible:opacity-100 group-hover:opacity-100"
+        className="absolute top-2 right-2 grid size-8 place-items-center rounded-md text-ink-3 transition-opacity hover:bg-critical-soft hover:text-critical focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
       >
         <Trash size={14} />
       </button>
       {isNow ? (
-        <span className="absolute -top-2 left-3 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">
+        <span className="absolute -top-2 left-3 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-ink-invert">
           In progress
         </span>
       ) : null}
@@ -68,7 +68,7 @@ function ClassCard({ row, isNow, onEdit, onDelete }) {
 function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
   if (loading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {DAYS.map((day) => (
           <div key={day} className="space-y-2">
             <Skeleton className="h-4 w-20" />
@@ -81,10 +81,13 @@ function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
   }
 
   const minutes = minutesOf(nowTime);
+  // A class can be created on any weekday through the API — never hide one.
+  const extraDays = [...new Set(rows.map((row) => row.day))].filter((day) => !DAYS.includes(day));
+  const columns = [...DAYS, ...extraDays];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-      {DAYS.map((day) => {
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      {columns.map((day) => {
         const classes = rows
           .filter((row) => row.day === day)
           .sort((a, b) => minutesOf(a.start_time) - minutesOf(b.start_time));
@@ -134,11 +137,12 @@ function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
 }
 
 export default function Schedules({ initialQuery = "" }) {
-  const { data, error, loading, refreshing, refresh } = useApi(config.endpoint);
-  const { today, weekday, nowTime } = useCampus();
+  const { data, error, staleError, loading, refreshing, refresh } = useApi(config.endpoint);
+  const { today, weekday, nowTime, profile, isTeacher } = useCampus();
   const [view, setView] = useState(initialQuery ? "table" : "timetable");
   const [query, setQuery] = useState(initialQuery);
   const [day, setDay] = useState("");
+  const [mine, setMine] = useState(isTeacher);
   const search = useDebounced(query);
 
   useSSE(config.entity, refresh);
@@ -154,13 +158,14 @@ export default function Schedules({ initialQuery = "" }) {
     const rows = data ?? [];
     const needle = search.trim().toLowerCase();
     return rows.filter((row) => {
+      if (mine && isTeacher && row.instructor !== profile.name) return false;
       if (day && row.day !== day) return false;
       if (!needle) return true;
       return config.searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(needle));
     });
-  }, [data, day, search]);
+  }, [data, day, search, mine, isTeacher, profile.name]);
 
-  const { sorted, sort, toggle } = useSort(filtered, { key: "day", direction: "asc" });
+  const { sorted, sort, toggle } = useSort(filtered, { key: "day", direction: "asc" }, config.columns);
 
   return (
     <div className="animate-fade-in">
@@ -192,9 +197,22 @@ export default function Schedules({ initialQuery = "" }) {
           }
         >
           <SearchInput value={query} onChange={setQuery} placeholder="Search course, room, instructor" id="search-schedules" />
-          <FilterSelect label="Day" options={DAYS} value={day} onChange={setDay} />
+          <FilterSelect label="Day" allLabel="Any day" options={DAYS} value={day} onChange={setDay} />
+          {isTeacher ? (
+            <Segmented
+              label="Scope"
+              value={mine ? "mine" : "all"}
+              onChange={(value) => setMine(value === "mine")}
+              options={[
+                { value: "mine", label: "My classes" },
+                { value: "all", label: "All classes" },
+              ]}
+            />
+          ) : null}
         </Toolbar>
       </PageHeader>
+
+      <StaleNotice message={staleError} onRetry={refresh} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
@@ -212,6 +230,7 @@ export default function Schedules({ initialQuery = "" }) {
         <DataTable
           columns={config.columns}
           rows={sorted}
+          label="Class schedules"
           loading={loading}
           sort={sort}
           onSort={toggle}
@@ -236,7 +255,8 @@ export default function Schedules({ initialQuery = "" }) {
       {crud.modal ? (
         <RecordModal
           title={crud.modal.mode === "edit" ? "Edit class" : "New class"}
-          description={crud.modal.mode === "edit" ? crud.modal.row.id : `Week runs Sunday to Thursday. Today is ${weekday}, ${today}.`}
+          recordKey={`class-${crud.modal.mode}-${crud.modal.row?.id ?? "new"}`}
+          description={`The university week runs Sunday to Thursday. Today is ${weekday}, ${today}.`}
           fields={config.fields}
           initial={crud.modal.row}
           submitLabel={crud.modal.mode === "edit" ? "Save changes" : "Add class"}

@@ -6,13 +6,15 @@ from .courses import ensure_course
 FIELDS = ["course", "title", "day", "start_time", "end_time", "room", "instructor", "section"]
 
 
-def list_schedules(day: str | None = None, course: str | None = None) -> list[dict]:
+def list_schedules(day: str | None = None, course: str | None = None, instructor: str | None = None) -> list[dict]:
     sql, params = "SELECT * FROM schedules", []
     conds = []
     if day:
         conds.append("day = %s"); params.append(day)
     if course:
         conds.append("course ILIKE %s"); params.append(f"%{course}%")
+    if instructor:
+        conds.append("instructor ILIKE %s"); params.append(f"%{instructor}%")
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY array_position(%s::text[], day), start_time", params + [DAYS])
