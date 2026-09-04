@@ -17,6 +17,7 @@ import Rooms from "./pages/Rooms.jsx";
 import Schedules from "./pages/Schedules.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
+import LandingPage from "./landing/LandingPage.tsx";
 
 const NAV = [
   { id: "overview", label: "Today", icon: Today },
@@ -80,7 +81,7 @@ function AccountCard() {
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
           <span className="block truncate text-[11px] text-ink-3 tabular">
-            {account?.student_id || account?.employee_id || account?.role_id}
+            {account?.student_id ? `ID: ${account.student_id}` : "Student (Full Access)"}
           </span>
         </span>
       </div>
@@ -234,9 +235,9 @@ function Shell() {
 }
 
 /** Nothing is readable without an identity: the whole dashboard is scoped to the signed-in account. */
-function Gate() {
+function Gate({ initialView = "signin" }) {
   const { account } = useCampus();
-  const [view, setView] = useState("signin");
+  const [view, setView] = useState(initialView);
 
   if (account) return <Shell />;
 
@@ -249,10 +250,33 @@ function Gate() {
   );
 }
 
+const isLandingPath = (pathname) => pathname === "/" || pathname === "";
+
 export default function App() {
+  // "/" is the marketing page; every other path drops into the gated app.
+  const [entered, setEntered] = useState(() => !isLandingPath(window.location.pathname));
+  const [initialView, setInitialView] = useState(() =>
+    /signup|register/i.test(window.location.pathname) ? "signup" : "signin",
+  );
+
+  useEffect(() => {
+    const onPop = () => setEntered(!isLandingPath(window.location.pathname));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const enter = (path) => {
+    window.history.pushState(null, "", path);
+    setInitialView(/signup|register/i.test(path) ? "signup" : "signin");
+    setEntered(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  if (!entered) return <LandingPage onNavigate={enter} />;
+
   return (
     <CampusProvider>
-      <Gate />
+      <Gate initialView={initialView} />
     </CampusProvider>
   );
 }

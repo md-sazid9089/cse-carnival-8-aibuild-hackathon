@@ -82,7 +82,7 @@ STUDENT_PERMISSIONS = [
 ]
 
 
-def get_user_permissions(role_id: str) -> list[str]:
+def get_user_permissions(role_id: str = "student") -> list[str]:
     """Migration 004 dropped the roles tables: every account is a student."""
     return list(STUDENT_PERMISSIONS)
 

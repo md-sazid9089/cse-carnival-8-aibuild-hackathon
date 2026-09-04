@@ -39,7 +39,7 @@ export function CampusProvider({ children }) {
     () => ({
       student_id: account?.student_id ?? "",
       name: account?.name ?? "",
-      role: account?.role_id ?? "",
+      role: account?.role_id ?? "student",
     }),
     [account],
   );
