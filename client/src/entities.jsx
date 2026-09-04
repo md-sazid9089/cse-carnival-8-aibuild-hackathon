@@ -13,13 +13,13 @@ export const entities = {
     singular: "class",
     endpoint: "/api/schedules",
     entity: "schedules",
-    blurb: "Every timetabled class — the source the assistant reads for “when is my next class?”.",
+    blurb: "Every timetabled class, Sunday to Thursday.",
     searchKeys: ["course", "title", "room", "instructor", "section"],
-    filters: [{ key: "day", label: "Day", options: DAYS }],
+    filters: [{ key: "day", label: "Day", allLabel: "Any day", options: DAYS }],
     columns: [
       { key: "course", label: "Course", primary: true, sortable: true },
       { key: "title", label: "Title", wrap: true },
-      { key: "day", label: "Day", sortable: true },
+      { key: "day", label: "Day", sortable: true, sortValue: (r) => DAYS.indexOf(r.day) },
       {
         key: "start_time",
         label: "Time",
@@ -47,9 +47,9 @@ export const entities = {
     singular: "announcement",
     endpoint: "/api/announcements",
     entity: "announcements",
-    blurb: "Campus notices. High-priority notices can override the timetable, so the assistant cross-checks them.",
+    blurb: "Notices from departments and clubs. High-priority ones can change today’s plan.",
     searchKeys: ["title", "body", "posted_by"],
-    filters: [{ key: "priority", label: "Priority", options: ["high", "medium", "low"] }],
+    filters: [{ key: "priority", label: "Priority", allLabel: "Any priority", options: ["high", "medium", "low"] }],
     columns: [
       { key: "title", label: "Title", primary: true, wrap: true, sortable: true },
       { key: "priority", label: "Priority", sortable: true, render: badge("priority") },
@@ -72,9 +72,11 @@ export const entities = {
     singular: "assignment",
     endpoint: "/api/assignments",
     entity: "assignments",
-    blurb: "Deadlines across every course — what “what’s due this week?” resolves against.",
+    blurb: "Every deadline across your courses, closest first.",
     searchKeys: ["title", "course", "course_title", "description", "submission_platform"],
-    filters: [{ key: "status", label: "Status", options: ["pending", "submitted", "graded", "late"] }],
+    filters: [
+      { key: "status", label: "Status", allLabel: "Any status", options: ["pending", "submitted", "graded", "late"] },
+    ],
     columns: [
       { key: "title", label: "Assignment", primary: true, wrap: true, sortable: true },
       { key: "course", label: "Course", sortable: true },
@@ -100,9 +102,9 @@ export const entities = {
       { key: "description", label: "Description", type: "textarea", wide: true },
       { key: "assigned_date", label: "Assigned on", type: "date" },
       { key: "deadline", label: "Deadline", type: "date" },
-      { key: "submission_platform", label: "Submission platform", placeholder: "Google Classroom" },
+      { key: "submission_platform", label: "Submission platform", default: "Google Classroom" },
       { key: "status", label: "Status", type: "select", options: ["pending", "submitted", "graded", "late"], default: "pending" },
-      { key: "marks", label: "Marks", type: "number", min: 0 },
+      { key: "marks", label: "Marks", type: "number", min: 0, default: 0, optional: true, hint: "0 until graded" },
     ],
   },
 };
@@ -121,15 +123,14 @@ export const roomFields = [
   { key: "type", label: "Type", type: "select", options: ["classroom", "lab", "seminar"] },
   { key: "capacity", label: "Capacity", type: "number", min: 1 },
   { key: "floor", label: "Floor", type: "number", min: 0 },
-  { key: "equipment", label: "Equipment", type: "tags", wide: true, hint: "Comma separated — e.g. projector, whiteboard, ac" },
-  { key: "status", label: "Status", type: "select", options: ["available", "unavailable"], default: "available" },
+  { key: "equipment", label: "Equipment", type: "tags", wide: true, hint: "Comma separated — e.g. projector, whiteboard, ac" },  { key: "status", label: "Status", type: "select", options: ["available", "unavailable"], default: "available" },
 ];
 
 export const eventFields = [
   { key: "name", label: "Event name", wide: true },
   { key: "description", label: "Description", type: "textarea", wide: true },
   { key: "date", label: "Date", type: "date" },
-  { key: "end_date", label: "End date", type: "date", optional: true, hint: "Only for multi-day events" },
+  { key: "end_date", label: "End date", type: "date", optional: true, omitWhenEmpty: true, hint: "Only for multi-day events" },
   { key: "start_time", label: "Start", type: "time" },
   { key: "end_time", label: "End", type: "time" },
   { key: "venue", label: "Venue", placeholder: "7C01" },

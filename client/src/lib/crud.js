@@ -5,26 +5,28 @@ import { titleCase } from "./format.js";
 
 /**
  * Create / edit / delete wiring shared by every resource page.
- * Deletes always go through a confirmation step; every outcome is announced.
+ *
+ * `save` deliberately rethrows: the form shows the server's reason inline and
+ * keeps what the user typed. Deletes always go through a confirmation step.
  */
 export function useCrud({ endpoint, singular, refresh, labelFor = (row) => row.id }) {
   const [modal, setModal] = useState(null);
 
+  const openCreate = useCallback(() => setModal({ mode: "create" }), []);
+  const openEdit = useCallback((row) => setModal({ mode: "edit", row }), []);
+  const close = useCallback(() => setModal(null), []);
+
   const save = useCallback(
     async (form) => {
-      try {
-        if (modal?.mode === "edit") {
-          await api.put(`${endpoint}/${modal.row.id}`, form);
-          toast(`${titleCase(singular)} updated`, "success");
-        } else {
-          await api.post(endpoint, form);
-          toast(`${titleCase(singular)} added`, "success");
-        }
-        setModal(null);
-        refresh();
-      } catch (error) {
-        toast(error.message, "error");
+      if (modal?.mode === "edit") {
+        await api.put(`${endpoint}/${modal.row.id}`, form);
+        toast(`${titleCase(singular)} updated`, "success");
+      } else {
+        await api.post(endpoint, form);
+        toast(`${titleCase(singular)} added`, "success");
       }
+      setModal(null);
+      refresh();
     },
     [endpoint, modal, refresh, singular],
   );
@@ -33,7 +35,7 @@ export function useCrud({ endpoint, singular, refresh, labelFor = (row) => row.i
     async (row) => {
       const confirmed = await confirmAction({
         title: `Delete this ${singular}?`,
-        message: `“${labelFor(row)}” will be removed for everyone, and the assistant will stop seeing it. This cannot be undone.`,
+        message: `“${labelFor(row)}” will be removed for everyone. This cannot be undone.`,
         confirmLabel: `Delete ${singular}`,
       });
       if (!confirmed) return;
@@ -48,17 +50,10 @@ export function useCrud({ endpoint, singular, refresh, labelFor = (row) => row.i
     [endpoint, labelFor, refresh, singular],
   );
 
-  return {
-    modal,
-    openCreate: () => setModal({ mode: "create" }),
-    openEdit: (row) => setModal({ mode: "edit", row }),
-    close: () => setModal(null),
-    save,
-    remove,
-  };
+  return { modal, openCreate, openEdit, close, save, remove };
 }
 
-/** Runs an action and reports the outcome, keeping pages free of try/catch noise. */
+/** Runs a one-shot action and reports the outcome, keeping pages free of try/catch noise. */
 export async function runAction(promise, { success, refresh }) {
   try {
     const result = await promise;

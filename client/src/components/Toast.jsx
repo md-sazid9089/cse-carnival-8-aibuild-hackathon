@@ -3,29 +3,50 @@ import { cx } from "../lib/format.js";
 import { Alert, CheckCircle, Info, X } from "../lib/icons.jsx";
 
 const KINDS = {
-  success: { icon: CheckCircle, className: "text-positive" },
-  error: { icon: Alert, className: "text-critical" },
-  info: { icon: Info, className: "text-accent" },
+  success: { icon: CheckCircle, className: "text-positive", noun: "Success" },
+  error: { icon: Alert, className: "text-critical", noun: "Error" },
+  info: { icon: Info, className: "text-accent", noun: "Note" },
 };
 
-const DURATION = 4200;
+const DURATION = 5000;
 
 export default function Toast() {
   const [toasts, setToasts] = useState([]);
   const timers = useRef(new Map());
 
-  const dismiss = useCallback((id) => {
+  const clearTimer = useCallback((id) => {
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
-    setToasts((list) => list.filter((t) => t.id !== id));
   }, []);
+
+  const dismiss = useCallback(
+    (id) => {
+      clearTimer(id);
+      setToasts((list) => list.filter((t) => t.id !== id));
+    },
+    [clearTimer],
+  );
+
+  // Errors stay until dismissed: they are the ones worth reading twice.
+  const schedule = useCallback(
+    (toast) => {
+      if (toast.kind === "error") return;
+      clearTimer(toast.id);
+      timers.current.set(toast.id, setTimeout(() => dismiss(toast.id), DURATION));
+    },
+    [clearTimer, dismiss],
+  );
 
   useEffect(() => {
     const handler = (event) => {
-      const id = `${Date.now()}-${Math.random()}`;
-      // Cap the stack so a burst of SSE-driven writes cannot bury the UI.
-      setToasts((list) => [...list.slice(-2), { id, ...event.detail }]);
-      timers.current.set(id, setTimeout(() => dismiss(id), DURATION));
+      const toast = { id: `${Date.now()}-${Math.random()}`, ...event.detail };
+      setToasts((list) => {
+        // Cap the stack so a burst of live updates cannot bury the UI.
+        const dropped = list.slice(0, Math.max(0, list.length - 2));
+        dropped.forEach((t) => clearTimer(t.id));
+        return [...list.slice(-2), toast];
+      });
+      schedule(toast);
     };
     window.addEventListener("toast", handler);
     const pending = timers.current;
@@ -34,7 +55,7 @@ export default function Toast() {
       pending.forEach(clearTimeout);
       pending.clear();
     };
-  }, [dismiss]);
+  }, [clearTimer, schedule]);
 
   return (
     <div
@@ -42,14 +63,21 @@ export default function Toast() {
       role="region"
       aria-label="Notifications"
     >
+      {/* Always mounted so assistive tech announces text written into it. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {toasts.map((t) => `${KINDS[t.kind]?.noun ?? "Note"}: ${t.message}`).join(". ")}
+      </p>
+
       {toasts.map((toast) => {
         const kind = KINDS[toast.kind] ?? KINDS.info;
         const Icon = kind.icon;
         return (
           <div
             key={toast.id}
-            role={toast.kind === "error" ? "alert" : "status"}
-            aria-live={toast.kind === "error" ? "assertive" : "polite"}
+            onMouseEnter={() => clearTimer(toast.id)}
+            onMouseLeave={() => schedule(toast)}
+            onFocusCapture={() => clearTimer(toast.id)}
+            onBlurCapture={() => schedule(toast)}
             className="pointer-events-auto flex w-full max-w-md items-start gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-lg animate-rise"
           >
             <Icon size={17} className={cx("mt-px", kind.className)} />

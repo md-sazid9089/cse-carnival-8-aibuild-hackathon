@@ -13,6 +13,7 @@ from .agents.gateway import gateway
 from .agents.store import purge_old
 from .config import ALLOWED_ORIGINS, CLIENT_DIST
 from .db import migrate
+from .ratelimit import rate_limit_middleware
 from .routers.api import router
 from .search.embedder import warmup_async
 from .search.indexer import reindex_all
@@ -59,6 +60,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(rate_limit_middleware)
 
 
 @app.exception_handler(DomainError)

@@ -201,14 +201,15 @@ class Gateway:
         plan: list[tuple[str, KeyState]] = []
         if not self.keys:
             return plan
+        start = self._cursor  # snapshot then advance, so overlapping turns start on different keys
+        self._cursor = (start + 1) % len(self.keys)
         for model in (models or self.models):
             if not self.breakers.setdefault(model, Breaker()).closed():
                 continue
             for offset in range(len(self.keys)):
-                ks = self.keys[(self._cursor + offset) % len(self.keys)]
+                ks = self.keys[(start + offset) % len(self.keys)]
                 if ks.available():
                     plan.append((model, ks))
-        self._cursor = (self._cursor + 1) % max(1, len(self.keys))
         return plan
 
     def _body(self, model: str, messages: list[dict], tools: list[dict] | None,

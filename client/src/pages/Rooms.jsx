@@ -49,19 +49,36 @@ const Chip = ({ children }) => (
 
 /* ------------------------------------------------------- availability finder */
 
-function FreeRoomFinder({ today, onBook }) {
-  const [open, setOpen] = useState(false);
+function FreeRoomFinder({ today, onBook, invalidateKey }) {
+  const [open, setOpen] = useState(true);
   const [form, setForm] = useState({ date: today, start_time: "14:00", end_time: "16:00", min_capacity: "", equipment: "" });
   const [results, setResults] = useState(null);
+  const [searched, setSearched] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  // The campus clock arrives after first paint; adopt it rather than the browser's.
+  useEffect(() => {
+    setForm((current) => (current.touchedDate ? current : { ...current, date: today }));
+  }, [today]);
+
+  // Availability is only true for the instant it was computed. Any change to the
+  // question, or to any room anywhere, retires the previous answer.
+  useEffect(() => {
+    setResults(null);
+  }, [invalidateKey]);
+
+  const set = (key, value) => {
+    setResults(null);
+    setError(null);
+    setForm((current) => ({ ...current, [key]: value, ...(key === "date" ? { touchedDate: true } : null) }));
+  };
 
   const submit = async (event) => {
     event.preventDefault();
     if (form.end_time <= form.start_time) {
       setError("End time must be after the start time");
+      document.getElementById("finder-end")?.focus();
       return;
     }
     setBusy(true);
@@ -71,6 +88,7 @@ function FreeRoomFinder({ today, onBook }) {
     if (form.equipment.trim()) params.set("equipment", form.equipment.trim());
     try {
       setResults(await api.get(`/api/rooms/free?${params}`));
+      setSearched({ ...form });
     } catch (err) {
       setError(err.message);
       setResults(null);
@@ -92,7 +110,9 @@ function FreeRoomFinder({ today, onBook }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-ink">Find a free room</span>
-          <span className="block text-[13px] text-ink-3">Filter by time, size and equipment — checks bookings, classes and events.</span>
+          <span className="block text-[13px] text-ink-3">
+            Filter by time, size and equipment — checks bookings, classes and events.
+          </span>
         </span>
         <ChevronDown size={16} className={cx("text-ink-3 transition-transform duration-200", open && "rotate-180")} />
       </button>
@@ -100,55 +120,34 @@ function FreeRoomFinder({ today, onBook }) {
       {open ? (
         <div className="border-t border-line px-4 py-4">
           <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <label className="text-[13px] font-medium text-ink-2 lg:col-span-2">
-              Date
-              <input
-                type="date"
-                value={form.date}
-                onChange={(event) => set("date", event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
-              />
-            </label>
-            <label className="text-[13px] font-medium text-ink-2">
-              From
-              <input
-                type="time"
-                value={form.start_time}
-                onChange={(event) => set("start_time", event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
-              />
-            </label>
-            <label className="text-[13px] font-medium text-ink-2">
-              To
-              <input
-                type="time"
-                value={form.end_time}
-                onChange={(event) => set("end_time", event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
-              />
-            </label>
-            <label className="text-[13px] font-medium text-ink-2">
-              Min seats
-              <input
+            <Field label="Date" htmlFor="finder-date" required className="lg:col-span-2">
+              <TextInput id="finder-date" type="date" value={form.date} onChange={(e) => set("date", e.target.value)} />
+            </Field>
+            <Field label="From" htmlFor="finder-start" required>
+              <TextInput id="finder-start" type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
+            </Field>
+            <Field label="To" htmlFor="finder-end" required error={error}>
+              <TextInput id="finder-end" type="time" value={form.end_time} onChange={(e) => set("end_time", e.target.value)} invalid={Boolean(error)} />
+            </Field>
+            <Field label="Min seats" htmlFor="finder-cap">
+              <TextInput
+                id="finder-cap"
                 type="number"
                 min={1}
                 inputMode="numeric"
                 placeholder="Any"
                 value={form.min_capacity}
-                onChange={(event) => set("min_capacity", event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
+                onChange={(e) => set("min_capacity", e.target.value)}
               />
-            </label>
-            <label className="text-[13px] font-medium text-ink-2">
-              Equipment
-              <input
-                type="text"
+            </Field>
+            <Field label="Equipment" htmlFor="finder-equip">
+              <TextInput
+                id="finder-equip"
                 placeholder="projector"
                 value={form.equipment}
-                onChange={(event) => set("equipment", event.target.value)}
-                className="mt-1.5 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
+                onChange={(e) => set("equipment", e.target.value)}
               />
-            </label>
+            </Field>
             <div className="sm:col-span-2 lg:col-span-6">
               <Button type="submit" variant="primary" loading={busy} icon={Search}>
                 Search availability
@@ -156,37 +155,35 @@ function FreeRoomFinder({ today, onBook }) {
             </div>
           </form>
 
-          {error ? (
-            <p role="alert" className="mt-3 text-[13px] font-medium text-critical">
-              {error}
-            </p>
-          ) : null}
+          <p className="sr-only" aria-live="polite">
+            {busy ? "Searching" : results ? `${results.length} rooms free` : ""}
+          </p>
 
           {results ? (
             results.length ? (
               <div className="mt-4">
-                <p className="mb-2 text-[13px] text-ink-3" aria-live="polite">
-                  {results.length} room{results.length === 1 ? "" : "s"} free on {fmtDate(form.date)},{" "}
-                  {fmtTimeRange(form.start_time, form.end_time)}
+                <p className="mb-2 text-[13px] text-ink-2">
+                  {results.length} room{results.length === 1 ? "" : "s"} free on {fmtDate(searched.date)},{" "}
+                  {fmtTimeRange(searched.start_time, searched.end_time)}
                 </p>
                 <ul className="flex flex-wrap gap-2">
                   {results.map((room) => (
                     <li key={room.room_number}>
                       <button
                         type="button"
-                        onClick={() => onBook(room.room_number, form)}
-                        className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-accent/50 hover:bg-accent-soft"
+                        onClick={() => onBook(room.room_number, searched)}
+                        className="flex items-center gap-2 rounded-lg border border-line-control bg-surface px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent-soft"
                       >
-                        <span className="text-sm font-semibold text-ink">{room.room_number}</span>
-                        <span className="text-[12px] text-ink-3 tabular">{room.capacity} seats</span>
-                        <Check size={14} className="text-positive" />
+                        <span className="text-sm font-medium text-ink">Book {room.room_number}</span>
+                        <span className="text-[12px] text-ink-2 tabular">{room.capacity} seats</span>
+                        <ArrowRight size={14} className="text-ink-3" />
                       </button>
                     </li>
                   ))}
                 </ul>
               </div>
             ) : (
-              <p className="mt-4 text-[13px] text-ink-3" aria-live="polite">
+              <p className="mt-4 text-[13px] text-ink-2">
                 No room matches that window. Try a wider time range or fewer requirements.
               </p>
             )
@@ -199,9 +196,11 @@ function FreeRoomFinder({ today, onBook }) {
 
 /* --------------------------------------------------------------- room card */
 
-function RoomCard({ room, today, profileName, onBook, onEdit, onDelete, onCancelBooking }) {
+function RoomCard({ room, today, weekday, schedules, events, profileName, nowMinutes, onBook, onEdit, onDelete, onCancelBooking }) {
   const [open, setOpen] = useState(false);
-  const upcoming = room.bookings.filter((b) => b.date >= today);
+  const busy = busyWindows({ room, date: today, weekday, schedules, events });
+  const remaining = busy.filter((window) => minutesOf(window.end) > nowMinutes);
+  const unavailable = room.status !== "available";
 
   return (
     <Card interactive className="flex flex-col">
@@ -220,12 +219,10 @@ function RoomCard({ room, today, profileName, onBook, onEdit, onDelete, onCancel
           <Users size={14} className="text-ink-3" />
           {room.capacity} seats
         </span>
-        {upcoming.length ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Calendar size={14} className="text-ink-3" />
-            {upcoming.length} upcoming
-          </span>
-        ) : null}
+        <span className="inline-flex items-center gap-1.5">
+          <Calendar size={14} className="text-ink-3" />
+          {remaining.length ? `${remaining.length} busy slot${remaining.length === 1 ? "" : "s"} left today` : "Free for the rest of today"}
+        </span>
       </div>
 
       {room.equipment.length ? (
@@ -238,25 +235,18 @@ function RoomCard({ room, today, profileName, onBook, onEdit, onDelete, onCancel
         </div>
       ) : null}
 
-      <div className="mt-auto flex items-center gap-1 px-3 pt-4 pb-3">
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={Clock}
-          onClick={() => onBook(room)}
-          disabled={room.status !== "available"}
-          title={room.status !== "available" ? "This room is marked unavailable" : undefined}
-        >
+      <div className="mt-auto flex flex-wrap items-center gap-1 px-3 pt-4 pb-3">
+        <Button size="sm" variant="secondary" icon={Clock} onClick={() => onBook(room)} disabled={unavailable}>
           Book
         </Button>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
+          className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink"
         >
-          Bookings
-          <span className="tabular">({room.bookings.length})</span>
+          Busy today
+          <span className="tabular">({busy.length})</span>
           <ChevronDown size={13} className={cx("transition-transform duration-200", open && "rotate-180")} />
         </button>
         <span className="ml-auto flex items-center gap-0.5">
@@ -269,38 +259,50 @@ function RoomCard({ room, today, profileName, onBook, onEdit, onDelete, onCancel
             onClick={() => onDelete(room)}
           />
         </span>
+        {unavailable ? <p className="w-full px-1 pt-1 text-[12px] text-ink-2">Marked unavailable — bookings are refused.</p> : null}
       </div>
 
       {open ? (
         <div className="border-t border-line px-4 py-3">
-          {room.bookings.length ? (
+          {busy.length ? (
             <ul className="flex flex-col gap-2">
-              {room.bookings.map((booking) => {
-                const mine = booking.booked_by === profileName;
+              {busy.map((window) => {
+                const mine = window.kind === "booking" && window.by === profileName;
                 return (
-                  <li key={booking.booking_id} className="flex items-start justify-between gap-2 text-[13px]">
+                  <li key={window.key} className="flex items-start justify-between gap-2 text-[13px]">
                     <div className="min-w-0">
-                      <p className="font-medium text-ink tabular">
-                        {relativeDay(booking.date, today)} · {fmtTimeRange(booking.start_time, booking.end_time)}
+                      <p className="flex items-center gap-1.5 font-medium text-ink tabular">
+                        {fmtTimeRange(window.start, window.end)}
+                        <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase", BUSY_TONE[window.kind])}>
+                          {window.kind}
+                        </span>
                       </p>
-                      <p className="truncate text-ink-3">
-                        {booking.purpose} — {mine ? "you" : booking.booked_by}
+                      <p className="truncate text-ink-2">
+                        {window.label} — {mine ? "you" : window.by}
                       </p>
                     </div>
-                    {mine ? (
-                      <Button size="sm" variant="danger" onClick={() => onCancelBooking(room, booking)}>
-                        Cancel
-                      </Button>
-                    ) : (
-                      <span className="pt-1 text-[11px] text-ink-3">Not yours</span>
-                    )}
+                    {window.kind === "booking" ? (
+                      mine ? (
+                        <Button size="sm" variant="danger" onClick={() => onCancelBooking(room, window.booking)}>
+                          Cancel
+                        </Button>
+                      ) : (
+                        <span className="pt-1 text-[11px] text-ink-3">Not yours</span>
+                      )
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="text-[13px] text-ink-3">No bookings yet.</p>
+            <p className="text-[13px] text-ink-2">Nothing scheduled here today.</p>
           )}
+
+          {room.bookings.some((booking) => booking.date > today) ? (
+            <p className="mt-3 border-t border-line pt-2 text-[12px] text-ink-3">
+              Also booked later: {room.bookings.filter((b) => b.date > today).map((b) => relativeDay(b.date, today)).join(", ")}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </Card>
@@ -310,16 +312,25 @@ function RoomCard({ room, today, profileName, onBook, onEdit, onDelete, onCancel
 /* -------------------------------------------------------------------- page */
 
 export default function Rooms({ initialQuery = "" }) {
-  const { data, error, loading, refreshing, refresh } = useApi("/api/rooms");
-  const { today, profile } = useCampus();
+  const { data, error, staleError, loading, refreshing, refresh } = useApi("/api/rooms");
+  const schedules = useApi("/api/schedules");
+  const events = useApi("/api/events");
+  const { today, weekday, nowTime, profile } = useCampus();
   const [view, setView] = useState("grid");
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [booking, setBooking] = useState(null);
+  const [changeCount, setChangeCount] = useState(0);
   const search = useDebounced(query);
 
-  useSSE("rooms", refresh);
+  useSSE(["rooms", "schedules", "events"], (message) => {
+    if (message.entity === "rooms") refresh();
+    if (message.entity === "schedules") schedules.refresh();
+    if (message.entity === "events") events.refresh();
+    // Any of these can invalidate a previous availability answer.
+    setChangeCount((value) => value + 1);
+  });
 
   const crud = useCrud({
     endpoint: "/api/rooms",
@@ -353,7 +364,7 @@ export default function Rooms({ initialQuery = "" }) {
     { key: "bookings", label: "Bookings", align: "right", render: (r) => r.bookings.length },
   ];
 
-  const { sorted, sort, toggle } = useSort(filtered);
+  const { sorted, sort, toggle } = useSort(filtered, null, columns);
 
   const cancelBooking = async (room, bookingRecord) => {
     const confirmed = await confirmAction({
@@ -368,12 +379,12 @@ export default function Rooms({ initialQuery = "" }) {
     });
   };
 
+  // Throws on failure so the dialog can show the server's conflict reason inline.
   const submitBooking = async (form) => {
-    const result = await runAction(api.post(`/api/rooms/${booking.room.id}/bookings`, form), {
-      success: `Room ${booking.room.room_number} booked`,
-      refresh,
-    });
-    if (result) setBooking(null);
+    await api.post(`/api/rooms/${booking.room.id}/bookings`, form);
+    toast(`Room ${booking.room.room_number} booked`, "success");
+    setBooking(null);
+    refresh();
   };
 
   const openBookingFor = (room, prefill) => setBooking({ room, prefill });
@@ -381,13 +392,14 @@ export default function Rooms({ initialQuery = "" }) {
   const openBookingByNumber = (roomNumber, prefill) => {
     const room = (data ?? []).find((r) => r.room_number === roomNumber);
     if (room) openBookingFor(room, prefill);
+    else toast(`Room ${roomNumber} is no longer listed — refresh and try again.`, "error");
   };
 
   return (
     <div className="animate-fade-in">
       <PageHeader
         title="Rooms"
-        blurb="Every bookable space on campus. Bookings are checked against existing bookings, the class timetable and scheduled events."
+        blurb="Every bookable space on campus, with the times each one is already taken."
         actions={
           <Button variant="primary" icon={Plus} onClick={crud.openCreate}>
             <span className="hidden sm:inline">Add room</span>
@@ -413,17 +425,19 @@ export default function Rooms({ initialQuery = "" }) {
           }
         >
           <SearchInput value={query} onChange={setQuery} placeholder="Search room or equipment" id="search-rooms" />
-          <FilterSelect label="Type" options={TYPES} value={type} onChange={setType} />
-          <FilterSelect label="Status" options={STATUSES} value={status} onChange={setStatus} />
+          <FilterSelect label="Type" allLabel="Any type" options={TYPES} value={type} onChange={setType} />
+          <FilterSelect label="Status" allLabel="Any status" options={STATUSES} value={status} onChange={setStatus} />
         </Toolbar>
       </PageHeader>
 
-      <FreeRoomFinder today={today} onBook={openBookingByNumber} />
+      <StaleNotice message={staleError} onRetry={refresh} />
+
+      <FreeRoomFinder today={today} onBook={openBookingByNumber} invalidateKey={changeCount} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
       ) : loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-52 w-full rounded-xl" />
           ))}
@@ -454,12 +468,16 @@ export default function Rooms({ initialQuery = "" }) {
           />
         </Card>
       ) : view === "grid" ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {filtered.map((room) => (
             <RoomCard
               key={room.id}
               room={room}
               today={today}
+              weekday={weekday}
+              nowMinutes={minutesOf(nowTime)}
+              schedules={schedules.data ?? []}
+              events={events.data ?? []}
               profileName={profile.name}
               onBook={openBookingFor}
               onEdit={crud.openEdit}
@@ -472,6 +490,7 @@ export default function Rooms({ initialQuery = "" }) {
         <DataTable
           columns={columns}
           rows={sorted}
+          label="Rooms"
           sort={sort}
           onSort={toggle}
           onEdit={crud.openEdit}
@@ -492,6 +511,7 @@ export default function Rooms({ initialQuery = "" }) {
       {crud.modal ? (
         <RecordModal
           title={crud.modal.mode === "edit" ? `Edit room ${crud.modal.row.room_number}` : "New room"}
+          recordKey={`room-${crud.modal.mode}-${crud.modal.row?.id ?? "new"}`}
           fields={roomFields}
           initial={crud.modal.row}
           submitLabel={crud.modal.mode === "edit" ? "Save changes" : "Add room"}
@@ -503,6 +523,7 @@ export default function Rooms({ initialQuery = "" }) {
       {booking ? (
         <RecordModal
           title={`Book room ${booking.room.room_number}`}
+          recordKey={`booking-${booking.room.id}`}
           description={`${booking.room.capacity} seats · ${booking.room.equipment.join(", ") || "no listed equipment"}`}
           fields={bookingFields}
           initial={booking.prefill ?? { date: today }}

@@ -1,3 +1,4 @@
+import { useStreamStatus } from "../hooks.js";
 import { cx, titleCase } from "../lib/format.js";
 import { Alert, Refresh, Search, X } from "../lib/icons.jsx";
 import { Button, Select } from "./ui.jsx";
@@ -23,12 +24,13 @@ export function SearchInput({ value, onChange, placeholder = "Search…", id = "
       <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
       <input
         id={id}
-        type="search"
+        type="text"
+        role="searchbox"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-9 w-full rounded-lg border border-line bg-surface pr-8 pl-9 text-sm transition-colors hover:border-line-strong"
+        className="h-9 w-full rounded-lg border border-line-control bg-surface pr-8 pl-9 text-sm transition-colors hover:border-ink-3"
       />
       {value ? (
         <button
@@ -44,7 +46,7 @@ export function SearchInput({ value, onChange, placeholder = "Search…", id = "
   );
 }
 
-export function FilterSelect({ label, value, options, onChange }) {
+export function FilterSelect({ label, allLabel, value, options, onChange }) {
   const id = `filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
     <div className="flex items-center gap-2">
@@ -52,7 +54,7 @@ export function FilterSelect({ label, value, options, onChange }) {
         Filter by {label}
       </label>
       <Select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-auto min-w-32">
-        <option value="">All {label.toLowerCase()}</option>
+        <option value="">{allLabel ?? `All ${label.toLowerCase()}`}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {titleCase(option)}
@@ -76,22 +78,48 @@ export function Toolbar({ children, right }) {
 export function ResultCount({ shown, total, noun }) {
   const filtered = shown !== total;
   return (
-    <p className="text-[13px] text-ink-3 tabular" aria-live="polite">
+    <p className="hidden text-[13px] text-ink-3 tabular sm:block" aria-live="polite">
       {filtered ? `${shown} of ${total} ${noun}` : `${total} ${noun}`}
     </p>
   );
 }
 
-/** Small "reading live data" affordance — reassures judges that nothing is cached. */
+/** Freshness badge driven by the real EventSource state — a status light that
+ *  cannot be wrong is not a status light. */
 export function LiveDot({ active = false, className = "" }) {
+  const status = useStreamStatus();
+  const tone = {
+    live: { dot: "bg-positive", label: "Live", title: "Connected — updates arrive as they happen" },
+    connecting: { dot: "bg-caution", label: "Connecting", title: "Reconnecting to the campus server" },
+    offline: { dot: "bg-critical", label: "Offline", title: "Not connected — this view may be out of date" },
+  }[status];
+
   return (
-    <span className={cx("inline-flex items-center gap-1.5 text-[13px] text-ink-3", className)} title="Reads the database on every change — nothing is cached">
+    <span className={cx("inline-flex items-center gap-1.5 text-[13px] text-ink-2", className)} title={tone.title}>
       <span className="relative flex size-2">
-        {active ? <span className="absolute inline-flex size-2 animate-ping rounded-full bg-positive opacity-70" /> : null}
-        <span className="relative inline-flex size-2 rounded-full bg-positive" />
+        {active && status === "live" ? (
+          <span className={cx("absolute inline-flex size-2 animate-ping rounded-full opacity-70", tone.dot)} />
+        ) : null}
+        <span className={cx("relative inline-flex size-2 rounded-full", tone.dot)} />
       </span>
-      Live
+      <span className="hidden sm:inline">{tone.label}</span>
+      <span className="sr-only sm:hidden">{tone.label}</span>
     </span>
+  );
+}
+
+/** A background refresh failed but the page still has data — say so without
+ *  replacing what the user is reading. */
+export function StaleNotice({ message, onRetry }) {
+  if (!message) return null;
+  return (
+    <div className="mb-3 flex items-center gap-2 rounded-lg border border-caution/30 bg-caution-soft px-3 py-2 text-[13px] text-ink-2">
+      <Alert size={15} className="shrink-0 text-caution" />
+      <span className="min-w-0 flex-1">Couldn’t refresh just now — showing the last data received.</span>
+      <Button size="sm" variant="ghost" icon={Refresh} onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
   );
 }
 
@@ -103,12 +131,12 @@ export function ErrorState({ message, onRetry }) {
     >
       <Alert size={18} className="text-critical" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-ink">Could not reach the campus API</p>
+        <p className="text-sm font-medium text-ink">This didn’t load</p>
         <p className="mt-0.5 text-[13px] text-ink-2">{message}</p>
       </div>
       {onRetry ? (
         <Button icon={Refresh} onClick={onRetry} size="sm">
-          Retry
+          Try again
         </Button>
       ) : null}
     </div>

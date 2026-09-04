@@ -159,7 +159,13 @@ async def _call(messages, tools, choice, emit) -> dict:
                 buffer.append(payload)
                 await emit("token", payload)
             elif kind == "done":
-                if payload["finish_reason"] == "error" and not (payload["message"].get("tool_calls")):
+                if payload["finish_reason"] == "error" and not payload["message"].get("tool_calls"):
+                    text = "".join(buffer).strip()
+                    if len(text) > 40:
+                        # the answer was essentially complete when the stream dropped: keep it
+                        return {"message": {"role": "assistant", "content": text, "tool_calls": None},
+                                "finish_reason": "stop", "model": payload.get("model"),
+                                "key_index": payload.get("key_index")}
                     raise LLMError("stream interrupted", "STREAM_INTERRUPTED")
                 return payload
     except LLMError:

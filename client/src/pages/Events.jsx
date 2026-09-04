@@ -2,18 +2,27 @@ import { useMemo, useState } from "react";
 import { api } from "../api.js";
 import { confirmAction } from "../components/ConfirmDialog.jsx";
 import DataTable from "../components/DataTable.jsx";
-import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, Toolbar } from "../components/page.jsx";
+import {
+  ErrorState,
+  FilterSelect,
+  LiveDot,
+  PageHeader,
+  ResultCount,
+  SearchInput,
+  StaleNotice,
+  Toolbar,
+} from "../components/page.jsx";
 import RecordModal from "../components/RecordModal.jsx";
 import { Button, Card, EmptyState, IconButton, Meter, Segmented, Skeleton, StatusBadge } from "../components/ui.jsx";
 import { eventFields } from "../entities.jsx";
 import { useApi, useDebounced, useSort, useSSE } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { runAction, useCrud } from "../lib/crud.js";
-import { cx, fmtDate, fmtTimeRange, parseDate, relativeDay } from "../lib/format.js";
+import { cx, fmtDate, fmtTimeRange, MONTHS, parseDate, relativeDay } from "../lib/format.js";
+import { registrationState } from "../lib/rules.js";
 import { Check, Grid, Pencil, Pin, Plus, Rows, Search, Ticket, Trash, User, Users } from "../lib/icons.jsx";
 
 const STATUSES = ["upcoming", "ongoing", "completed", "cancelled", "full"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function DateBlock({ iso, dimmed }) {
   const date = parseDate(iso);
@@ -31,19 +40,18 @@ function DateBlock({ iso, dimmed }) {
   );
 }
 
-function EventCard({ event, today, registered, onRegister, onUnregister, onEdit, onDelete, busy }) {
-  const closed = event.status === "cancelled" || event.status === "completed";
-  const isFull = event.registered >= event.capacity;
-  const blocked = closed || (isFull && !registered);
-  const reason = closed ? `This event is ${event.status}` : isFull ? "This event is full" : undefined;
+function EventCard({ event, today, state, onRegister, onUnregister, onEdit, onDelete, busy }) {
+  const { registered, blocked, reason, closed } = state;
 
   return (
-    <Card interactive className={cx("flex flex-col", closed && "opacity-75")}>
+    <Card interactive className="flex flex-col">
       <div className="flex items-start gap-3 px-4 pt-4">
         <DateBlock iso={event.date} dimmed={closed} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-[15px] leading-snug font-semibold text-ink">{event.name}</h3>
+            <h3 className={cx("text-[15px] leading-snug font-semibold", closed ? "text-ink-2" : "text-ink")}>
+              {event.name}
+            </h3>
             <StatusBadge value={event.status} />
           </div>
           <p className="mt-1 text-[13px] text-ink-3 tabular">
@@ -79,15 +87,7 @@ function EventCard({ event, today, registered, onRegister, onUnregister, onEdit,
             Cancel registration
           </Button>
         ) : (
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={Ticket}
-            onClick={() => onRegister(event)}
-            disabled={blocked}
-            loading={busy}
-            title={reason}
-          >
+          <Button size="sm" variant="secondary" icon={Ticket} onClick={() => onRegister(event)} disabled={blocked} loading={busy}>
             Register
           </Button>
         )}
@@ -96,7 +96,7 @@ function EventCard({ event, today, registered, onRegister, onUnregister, onEdit,
             <Check size={14} /> You're in
           </span>
         ) : reason ? (
-          <span className="text-[13px] text-ink-3">{reason}</span>
+          <span className="text-[13px] text-ink-2">{reason}</span>
         ) : null}
         <span className="ml-auto flex items-center gap-0.5">
           <IconButton icon={Pencil} label={`Edit ${event.name}`} size={15} onClick={() => onEdit(event)} />
@@ -108,7 +108,7 @@ function EventCard({ event, today, registered, onRegister, onUnregister, onEdit,
 }
 
 export default function Events({ initialQuery = "" }) {
-  const { data, error, loading, refreshing, refresh } = useApi("/api/events");
+  const { data, error, staleError, loading, refreshing, refresh } = useApi("/api/events");
   const { today, profile } = useCampus();
   const [view, setView] = useState("grid");
   const [query, setQuery] = useState(initialQuery);
@@ -120,7 +120,7 @@ export default function Events({ initialQuery = "" }) {
 
   const crud = useCrud({ endpoint: "/api/events", singular: "event", refresh, labelFor: (row) => row.name });
 
-  const isRegistered = (event) => event.registrations?.some((r) => r.student_id === profile.student_id);
+  const stateOf = (event) => registrationState(event, profile.student_id);
 
   const filtered = useMemo(() => {
     const rows = data ?? [];
@@ -133,7 +133,10 @@ export default function Events({ initialQuery = "" }) {
           String(value ?? "").toLowerCase().includes(needle),
         );
       })
-      .sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time));
+      .sort(
+        (a, b) =>
+          String(a.date).localeCompare(String(b.date)) || String(a.start_time).localeCompare(String(b.start_time)),
+      );
   }, [data, search, status]);
 
   const register = async (event) => {
@@ -170,7 +173,7 @@ export default function Events({ initialQuery = "" }) {
     { key: "status", label: "Status", sortable: true, render: (r) => <StatusBadge value={r.status} /> },
   ];
 
-  const { sorted, sort, toggle } = useSort(filtered);
+  const { sorted, sort, toggle } = useSort(filtered, null, columns);
 
   return (
     <div className="animate-fade-in">
@@ -202,9 +205,11 @@ export default function Events({ initialQuery = "" }) {
           }
         >
           <SearchInput value={query} onChange={setQuery} placeholder="Search events" id="search-events" />
-          <FilterSelect label="Status" options={STATUSES} value={status} onChange={setStatus} />
+          <FilterSelect label="Status" allLabel="Any status" options={STATUSES} value={status} onChange={setStatus} />
         </Toolbar>
       </PageHeader>
+
+      <StaleNotice message={staleError} onRetry={refresh} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
@@ -228,13 +233,13 @@ export default function Events({ initialQuery = "" }) {
           />
         </Card>
       ) : view === "grid" ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {filtered.map((event) => (
             <EventCard
               key={event.id}
               event={event}
               today={today}
-              registered={isRegistered(event)}
+              state={stateOf(event)}
               busy={pending === event.id}
               onRegister={register}
               onUnregister={unregister}
@@ -247,13 +252,15 @@ export default function Events({ initialQuery = "" }) {
         <DataTable
           columns={columns}
           rows={sorted}
+          label="Events"
           sort={sort}
           onSort={toggle}
           onEdit={crud.openEdit}
           onDelete={crud.remove}
           labelFor={(row) => row.name}
-          rowActions={(row) =>
-            isRegistered(row) ? (
+          rowActions={(row) => {
+            const state = stateOf(row);
+            return state.registered ? (
               <IconButton
                 icon={Users}
                 label={`Cancel registration for ${row.name}`}
@@ -264,20 +271,23 @@ export default function Events({ initialQuery = "" }) {
             ) : (
               <IconButton
                 icon={Ticket}
-                label={`Register for ${row.name}`}
+                label={state.reason ? `Cannot register for ${row.name}: ${state.reason}` : `Register for ${row.name}`}
                 size={15}
                 onClick={() => register(row)}
-                disabled={row.registered >= row.capacity || row.status === "cancelled" || row.status === "completed"}
+                disabled={state.blocked}
               />
-            )
-          }
+            );
+          }}
         />
       )}
 
       {crud.modal ? (
         <RecordModal
           title={crud.modal.mode === "edit" ? "Edit event" : "New event"}
-          description={crud.modal.mode === "edit" ? crud.modal.row.id : undefined}
+          recordKey={`event-${crud.modal.mode}-${crud.modal.row?.id ?? "new"}`}
+          description={
+            crud.modal.row ? `${fmtDate(crud.modal.row.date)} · ${crud.modal.row.venue}` : "Appears on the campus calendar immediately."
+          }
           fields={eventFields}
           initial={crud.modal.row ?? { date: today }}
           submitLabel={crud.modal.mode === "edit" ? "Save changes" : "Add event"}

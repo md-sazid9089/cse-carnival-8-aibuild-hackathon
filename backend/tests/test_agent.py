@@ -422,6 +422,67 @@ check("agent: deployment daily cap -> friendly message, no provider call", res["
 # ---------------------------------------------------------------- cleanup + summary
 execute("DELETE FROM bookings WHERE booking_id NOT IN ('bk-001','bk-002','bk-003')")
 execute("DELETE FROM registrations WHERE student_id = '99-00001'")
+
+# ---------------------------------------------------------------- QA round fixes
+gw, fake = make_gateway([(200, _msg("a")), (200, _msg("b")), (200, _msg("c")), (200, _msg("d"))])
+for _ in range(4):
+    run(gw.complete([{"role": "user", "content": "x"}]))
+used = [c[0] for c in fake.calls]
+check("gateway: consecutive turns rotate across all three keys",
+      len(set(used)) == 3 and used[0] != used[1], used)
+
+gw, fake = make_gateway([(200, _msg("x"))] * 20)
+
+
+async def _burst():
+    return await asyncio.gather(*[gw.complete([{"role": "user", "content": "x"}]) for _ in range(9)])
+
+
+run(_burst())
+counts = {k: [c[0] for c in fake.calls].count(k) for k in set(c[0] for c in fake.calls)}
+check("gateway: concurrent load spreads over keys (no single-key hammering)",
+      len(counts) == 3 and max(counts.values()) <= 4, counts)
+
+
+class _DropStream(FakeRouter):
+    def handler(self, request):
+        body = json.loads(request.content)
+        self.calls.append((request.headers.get("authorization", ""), body["model"], True))
+        if body.get("stream"):  # long answer, then the connection dies before finish_reason
+            text = "data: " + json.dumps({"choices": [{"delta": {"content": "Your next class is CSE 4129 "
+                                                                            "on Sunday at 08:00 in room 7A05."}}]})
+            return httpx.Response(200, text=text + "\n", headers={"content-type": "text/event-stream"})
+        return httpx.Response(200, json=_msg("buffered"))
+
+
+config.OPENROUTER_API_KEYS = ["k-one"]
+gw_drop = Gateway()
+drop = _DropStream([])
+gw_drop._client = httpx.AsyncClient(base_url=config.OPENROUTER_BASE_URL,
+                                   transport=httpx.MockTransport(drop.handler))
+original = agent_mod.gateway
+agent_mod.gateway = gw_drop
+res = run(run_turn("When is my next class?", PROFILE, None))
+agent_mod.gateway = original
+check("agent: stream cut after a complete-looking answer keeps the text",
+      "CSE 4129" in res["reply"], res)
+
+from app.ratelimit import PER_MINUTE, _hits, check as rl_check  # noqa: E402
+
+
+class _Req:
+    def __init__(self, ip):
+        self.headers = {}
+        self.client = type("c", (), {"host": ip})()
+
+
+_hits.clear()
+allowed = [rl_check(_Req("1.2.3.4"))[0] for _ in range(PER_MINUTE + 3)]
+check("rate limit: blocks a device after the per-minute budget",
+      allowed[:PER_MINUTE] == [True] * PER_MINUTE and allowed[PER_MINUTE:] == [False, False, False], allowed[-4:])
+check("rate limit: a different device is unaffected", rl_check(_Req("5.6.7.8"))[0] is True)
+_hits.clear()
+
 print(f"\n{len(PASS)}/{len(PASS) + len(FAIL)} passed")
 if FAIL:
     print("FAILED: " + "; ".join(FAIL))

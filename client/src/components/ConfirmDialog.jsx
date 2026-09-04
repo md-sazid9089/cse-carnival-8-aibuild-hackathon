@@ -15,10 +15,16 @@ export function confirmAction({ title, message, confirmLabel = "Confirm", tone =
 
 export default function ConfirmHost() {
   const [request, setRequest] = useState(null);
+  const cancelRef = useRef(null);
   const confirmRef = useRef(null);
 
   useEffect(() => {
-    emit = setRequest;
+    // A second request while one is open would orphan the first promise.
+    emit = (next) =>
+      setRequest((current) => {
+        current?.resolve(false);
+        return next;
+      });
     return () => {
       emit = null;
     };
@@ -30,23 +36,22 @@ export default function ConfirmHost() {
   };
 
   if (!request) return null;
+  const destructive = request.tone === "danger";
 
   return (
     <Modal
       title={request.title}
       size="sm"
       onClose={() => settle(false)}
-      initialFocusRef={confirmRef}
+      // Never put initial focus on the destructive action: a reflexive Enter
+      // would delete a record the user has not read the warning for.
+      initialFocusRef={destructive ? cancelRef : confirmRef}
       footer={
         <>
-          <Button variant="ghost" onClick={() => settle(false)}>
+          <Button ref={cancelRef} variant="ghost" onClick={() => settle(false)}>
             Cancel
           </Button>
-          <Button
-            ref={confirmRef}
-            variant={request.tone === "danger" ? "dangerSolid" : "primary"}
-            onClick={() => settle(true)}
-          >
+          <Button ref={confirmRef} variant={destructive ? "dangerSolid" : "primary"} onClick={() => settle(true)}>
             {request.confirmLabel}
           </Button>
         </>

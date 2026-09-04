@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../lib/format.js";
+import { useFocusTrap } from "../lib/focus.js";
 import { X } from "../lib/icons.jsx";
 import { IconButton } from "./ui.jsx";
-
-const FOCUSABLE =
-  'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 /**
  * Accessible dialog: focus trap, focus restore, Esc to dismiss, scroll lock,
@@ -22,61 +20,10 @@ export default function Modal({
   initialFocusRef,
 }) {
   const panelRef = useRef(null);
-  const restoreRef = useRef(null);
   const headingId = useId();
   const descId = useId();
 
-  const focusables = useCallback(
-    () => Array.from(panelRef.current?.querySelectorAll(FOCUSABLE) ?? []).filter((el) => el.offsetParent !== null),
-    [],
-  );
-
-  useEffect(() => {
-    if (!open) return undefined;
-    restoreRef.current = document.activeElement;
-
-    const { overflow, paddingRight } = document.body.style;
-    const gap = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.overflow = "hidden";
-    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
-
-    const target = initialFocusRef?.current ?? focusables()[0] ?? panelRef.current;
-    // Wait a frame so the entrance animation does not fight the scroll-into-view.
-    const raf = requestAnimationFrame(() => target?.focus({ preventScroll: true }));
-
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose?.();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const items = focusables();
-      if (items.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !panelRef.current.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = overflow;
-      document.body.style.paddingRight = paddingRight;
-      restoreRef.current?.focus?.({ preventScroll: true });
-    };
-  }, [open, onClose, focusables, initialFocusRef]);
+  useFocusTrap({ active: open, containerRef: panelRef, onClose, initialFocusRef });
 
   if (!open) return null;
 
@@ -84,11 +31,7 @@ export default function Modal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div
-        className="absolute inset-0 bg-overlay animate-fade-in"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-overlay animate-fade-in" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
@@ -97,8 +40,8 @@ export default function Modal({
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cx(
-          "relative flex max-h-[92vh] w-full flex-col overflow-hidden bg-surface shadow-lg animate-sheet",
-          "rounded-t-2xl sm:rounded-2xl border border-line",
+          "relative flex max-h-[92dvh] w-full flex-col overflow-hidden bg-surface shadow-lg animate-sheet",
+          "rounded-t-2xl border border-line sm:rounded-2xl",
           width,
         )}
       >

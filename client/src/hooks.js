@@ -8,9 +8,11 @@ import { API_BASE, api } from "./api.js";
 export function useApi(path, { enabled = true } = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [staleError, setStaleError] = useState(null);
   const [loading, setLoading] = useState(enabled);
   const [refreshing, setRefreshing] = useState(false);
   const alive = useRef(true);
+  const ticket = useRef(0);
 
   useEffect(() => {
     alive.current = true;
@@ -22,19 +24,26 @@ export function useApi(path, { enabled = true } = {}) {
   const load = useCallback(
     async (mode = "initial") => {
       if (!enabled) return;
+      // A burst of change events fires several reads; only the newest may win.
+      const mine = ++ticket.current;
       if (mode === "background") setRefreshing(true);
       try {
         const result = await api.get(path);
-        if (!alive.current) return;
+        if (!alive.current || mine !== ticket.current) return;
         setData(result);
         setError(null);
+        setStaleError(null);
       } catch (err) {
-        if (!alive.current) return;
-        setError(err.message || "Could not load data");
+        if (!alive.current || mine !== ticket.current) return;
+        const message = err.message || "Could not load data";
+        // Never replace a page the user is reading because one refresh blipped.
+        if (mode === "background") setStaleError(message);
+        else setError(message);
       } finally {
-        if (!alive.current) return;
-        setLoading(false);
-        setRefreshing(false);
+        if (alive.current && mine === ticket.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [path, enabled],
@@ -48,18 +57,31 @@ export function useApi(path, { enabled = true } = {}) {
 
   const refresh = useCallback(() => load("background"), [load]);
 
-  return { data, error, loading, refreshing, refresh };
+  return { data, error, staleError, loading, refreshing, refresh };
 }
 
 /* -------------------------------------------------------------------- SSE */
 
 let source = null;
+let closeTimer = null;
 const listeners = new Set();
+const statusListeners = new Set();
+let streamStatus = "connecting";
+
+function setStatus(next) {
+  streamStatus = next;
+  statusListeners.forEach((fn) => fn(next));
+}
 
 function ensureStream() {
+  clearTimeout(closeTimer);
   if (source) return;
+  setStatus("connecting");
   source = new EventSource(API_BASE + "/api/stream");
+  source.onopen = () => setStatus("live");
+  source.onerror = () => setStatus(source?.readyState === 2 ? "offline" : "connecting");
   source.onmessage = (event) => {
+    setStatus("live");
     try {
       const message = JSON.parse(event.data);
       listeners.forEach((fn) => fn(message));
@@ -71,11 +93,14 @@ function ensureStream() {
 
 /**
  * One EventSource for the whole app — browsers cap concurrent connections per
- * origin and a single page mounts many live views at once.
+ * origin and a single page mounts many live views at once. Navigation briefly
+ * drops every subscriber, so teardown is deferred rather than immediate.
  */
 export function useSSE(entity, onChange) {
   const cb = useRef(onChange);
-  cb.current = onChange;
+  useEffect(() => {
+    cb.current = onChange;
+  });
   const key = Array.isArray(entity) ? entity.join(",") : entity;
 
   useEffect(() => {
@@ -88,11 +113,25 @@ export function useSSE(entity, onChange) {
     return () => {
       listeners.delete(listener);
       if (listeners.size === 0) {
-        source?.close();
-        source = null;
+        closeTimer = setTimeout(() => {
+          source?.close();
+          source = null;
+          setStatus("connecting");
+        }, 5000);
       }
     };
   }, [key]);
+}
+
+/** "live" | "connecting" | "offline" — so the freshness badge can tell the truth. */
+export function useStreamStatus() {
+  const [status, setLocal] = useState(streamStatus);
+  useEffect(() => {
+    statusListeners.add(setLocal);
+    setLocal(streamStatus);
+    return () => statusListeners.delete(setLocal);
+  }, []);
+  return status;
 }
 
 /* ------------------------------------------------------------------ theme */
@@ -143,22 +182,25 @@ export function useDebounced(value, delay = 220) {
 }
 
 /** Client-side sort that keeps table headers honest about their state. */
-export function useSort(rows, initial = null) {
+export function useSort(rows, initial = null, columns = []) {
   const [sort, setSort] = useState(initial);
 
   const sorted = useMemo(() => {
     if (!sort || !rows) return rows;
     const { key, direction } = sort;
     const factor = direction === "desc" ? -1 : 1;
+    // Weekday names and other display strings need an explicit ordinal.
+    const valueOf = columns.find((c) => c.key === key)?.sortValue ?? ((row) => row[key]);
     return [...rows].sort((a, b) => {
-      const av = a[key];
-      const bv = b[key];
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
       return String(av).localeCompare(String(bv), undefined, { numeric: true }) * factor;
     });
-  }, [rows, sort]);
+  }, [rows, sort, columns]);
 
   const toggle = useCallback((key) => {
     setSort((current) =>

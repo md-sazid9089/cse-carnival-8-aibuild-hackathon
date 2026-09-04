@@ -98,4 +98,4 @@ export function initials(name = "") {
 
 export const titleCase = (value = "") => String(value).charAt(0).toUpperCase() + String(value).slice(1);
 
-export { WEEKDAYS };
+export { MONTHS, WEEKDAYS };

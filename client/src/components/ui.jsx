@@ -229,13 +229,7 @@ export const Select = forwardRef(function Select({ className = "", invalid = fal
     <select
       ref={ref}
       aria-invalid={invalid || undefined}
-      className={cx(CONTROL, "h-9 appearance-none pr-8 capitalize", invalid && "border-critical", className)}
-      style={{
-        backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8a94' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 10px center",
-      }}
+      className={cx(CONTROL, "select-caret h-9 pr-8", invalid && "border-critical", className)}
       {...rest}
     >
       {children}

@@ -55,6 +55,7 @@ function SortHeader({ column, sort, onSort }) {
 export default function DataTable({
   columns,
   rows,
+  label,
   loading = false,
   onEdit,
   onDelete,
@@ -124,7 +125,7 @@ export default function DataTable({
               {secondary.map((column) => (
                 <div key={column.key} className={cx("min-w-0", column.wrap && "col-span-2")}>
                   <dt className="text-[11px] font-medium tracking-wide text-ink-3 uppercase">{column.label}</dt>
-                  <dd className="truncate text-[13px] text-ink-2 tabular">
+                  <dd className={cx("text-[13px] text-ink-2 tabular", column.wrap ? "break-words" : "truncate")}>
                     {column.render ? column.render(row) : String(row[column.key] ?? "—")}
                   </dd>
                 </div>
@@ -138,6 +139,7 @@ export default function DataTable({
       <div className="hidden overflow-hidden rounded-xl border border-line bg-surface shadow-xs md:block">
         <div className="max-h-[calc(100vh-16rem)] overflow-auto">
           <table className="w-full border-collapse text-sm">
+            {label ? <caption className="sr-only">{label}</caption> : null}
             <thead className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur">
               <tr className="border-b border-line">
                 {columns.map((column) => (
@@ -152,7 +154,7 @@ export default function DataTable({
               {rows.map((row) => (
                 <tr
                   key={getRowKey(row)}
-                  className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-2"
+                  className="border-b border-line transition-colors duration-100 last:border-0 hover:bg-surface-3"
                 >
                   {columns.map((column) => (
                     <td
