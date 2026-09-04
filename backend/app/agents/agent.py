@@ -122,9 +122,18 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
 
     for hop in range(config.AGENT_MAX_ITERATIONS):
         if time.monotonic() > deadline:
-            reply = _write_summary(trace) or ("That took longer than expected. "
-                                              "I checked: " + ", ".join(t["label"] for t in trace) +
-                                              ". Please ask again." if trace else BUSY)
+            done = _write_summary(trace)
+            if done:
+                reply = done
+                break
+            # Out of time on a read question: answer from the database rather than stalling.
+            slow = degraded.answer(user_msg, profile, note="slow") if config.AGENT_DEGRADED_MODE else None
+            if slow:
+                await _persist(cid, profile, user_msg, slow["reply"], slow["tool_calls"])
+                return {**slow, "conversation_id": cid, "agent": "degraded",
+                        "tool_calls": slow["tool_calls"]}
+            reply = ("That took longer than expected. I checked: " +
+                     ", ".join(t["label"] for t in trace) + ". Please ask again.") if trace else BUSY
             break
         tools, choice = tools_for(user_msg, first_hop=(hop == 0 or retried_toolless))
         if hop == 0:

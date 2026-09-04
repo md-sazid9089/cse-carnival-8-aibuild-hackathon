@@ -15,6 +15,7 @@ OFFLINE_MSG = ("The AI is temporarily unavailable, so I can't take actions right
 NOTES = {
     "offline": "**Read-only mode** — the AI model is unavailable, so this comes straight from live data.",
     "grounded": "**Straight from live data** — the model answered without reading the records, so here they are.",
+    "slow": "**Straight from live data** — the model was taking too long, so here are the records.",
 }
 
 # Anchored, non-backtracking patterns; write verbs and negations are excluded before matching.
