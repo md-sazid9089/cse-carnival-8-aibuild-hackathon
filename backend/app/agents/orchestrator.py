@@ -4,7 +4,7 @@ import re
 
 from ..config import FALLBACK_SINGLE_AGENT, OPENROUTER_MODEL, OPENROUTER_ROUTER_MODEL
 from .loop import run_loop
-from .openrouter import chat
+from .openrouter import LLMError, chat
 from .prompts import analyst_prompt, coordinator_prompt, router_prompt, single_agent_prompt
 from .tools import ALL_TOOLS, COORDINATOR_TOOLS, READ_TOOLS
 
@@ -23,12 +23,21 @@ def _classify(history: list[dict], profile: dict) -> dict | None:
                 if data.get("intent") in ("read_query", "action_request", "clarification_needed",
                                           "unauthorized", "smalltalk"):
                     return data
-        except Exception as exc:  # noqa: BLE001 - router failure falls back to single agent
+        except LLMError:
+            raise  # provider is down / key invalid — no point retrying with the specialist
+        except Exception as exc:  # noqa: BLE001 - malformed router output falls back to single agent
             print(f"[router] {exc}")
     return None
 
 
 def handle_chat(history: list[dict], profile: dict) -> dict:
+    try:
+        return _handle(history, profile)
+    except LLMError as exc:
+        return {"reply": f"⚠ {exc}", "agent": "error", "tool_calls": [], "intent": "error"}
+
+
+def _handle(history: list[dict], profile: dict) -> dict:
     if FALLBACK_SINGLE_AGENT:
         out = run_loop(OPENROUTER_MODEL, single_agent_prompt(profile), history, ALL_TOOLS, profile)
         return {**out, "agent": "assistant"}

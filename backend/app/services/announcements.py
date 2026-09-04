@@ -29,6 +29,8 @@ def _validate(data: dict) -> None:
     check_date(data["date"], "date")
     check_date(data["expires"], "expires")
     check_enum(data["priority"], PRIORITIES, "priority")
+    if str(data["expires"]) < str(data["date"]):
+        raise DomainError("INVALID_DATE", "expires must not be before date")
 
 
 def create_announcement(data: dict) -> dict:
