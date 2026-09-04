@@ -87,12 +87,12 @@ export function ProductMockup() {
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className="overflow-hidden rounded-2xl border border-line bg-canvas shadow-lg"
       >
-        <div className="flex items-center gap-1.5 border-b border-line bg-surface/70 px-4 py-2.5">
-          <span className="size-2.5 rounded-full bg-surface-3" />
-          <span className="size-2.5 rounded-full bg-surface-3" />
-          <span className="size-2.5 rounded-full bg-surface-3" />
-          <span className="ml-3 rounded-md bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-ink-3">
-            campusos.app/overview
+        <div className="flex items-center gap-1.5 border-b border-cream-200 bg-white/70 px-4 py-2.5">
+          <span className="size-2.5 rounded-full bg-cream-200" />
+          <span className="size-2.5 rounded-full bg-cream-200" />
+          <span className="size-2.5 rounded-full bg-cream-200" />
+          <span className="ml-3 rounded-md bg-cream-100 px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+            campusos.app/dashboard
           </span>
         </div>
 

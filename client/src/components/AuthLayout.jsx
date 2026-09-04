@@ -12,7 +12,7 @@ const PROOF = [
  * column that stays narrow enough to read comfortably. The panel is decorative
  * and collapses away entirely below `lg`.
  */
-export default function AuthLayout({ eyebrow, title, subtitle, children, footer }) {
+export default function AuthLayout({ eyebrow, title, subtitle, children, footer, onHome }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <aside
@@ -23,12 +23,25 @@ export default function AuthLayout({ eyebrow, title, subtitle, children, footer 
           className="pointer-events-none absolute -top-32 -right-24 size-96 rounded-full opacity-[0.16] blur-3xl"
           style={{ background: "radial-gradient(circle, var(--accent), transparent 70%)" }}
         />
-        <div className="relative flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-brand-panel-ink text-[13px] font-bold text-brand-panel">
-            C
-          </span>
-          <span className="text-sm font-semibold">CampusOS</span>
-        </div>
+        {onHome ? (
+          <button
+            type="button"
+            onClick={onHome}
+            className="relative flex items-center gap-2.5 text-left transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 rounded-lg cursor-pointer"
+          >
+            <span className="grid size-8 place-items-center rounded-lg bg-brand-panel-ink text-[13px] font-bold text-brand-panel">
+              C
+            </span>
+            <span className="text-sm font-semibold">CampusOS</span>
+          </button>
+        ) : (
+          <div className="relative flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-lg bg-brand-panel-ink text-[13px] font-bold text-brand-panel">
+              C
+            </span>
+            <span className="text-sm font-semibold">CampusOS</span>
+          </div>
+        )}
 
         <div className="relative max-w-md">
           <p className="text-[42px] leading-[1.08] font-semibold tracking-[-0.03em]">
@@ -61,12 +74,25 @@ export default function AuthLayout({ eyebrow, title, subtitle, children, footer 
 
       <main className="flex flex-col justify-center px-6 py-12 sm:px-10">
         <div className="mx-auto w-full max-w-104">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="grid size-8 place-items-center rounded-lg bg-ink text-[13px] font-bold text-ink-invert">
-              C
-            </span>
-            <span className="text-sm font-semibold text-ink">CampusOS</span>
-          </div>
+          {onHome ? (
+            <button
+              type="button"
+              onClick={onHome}
+              className="mb-8 flex items-center gap-2.5 text-left transition-opacity hover:opacity-85 lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-lg cursor-pointer"
+            >
+              <span className="grid size-8 place-items-center rounded-lg bg-ink text-[13px] font-bold text-ink-invert">
+                C
+              </span>
+              <span className="text-sm font-semibold text-ink">CampusOS</span>
+            </button>
+          ) : (
+            <div className="mb-8 flex items-center gap-2.5 lg:hidden">
+              <span className="grid size-8 place-items-center rounded-lg bg-ink text-[13px] font-bold text-ink-invert">
+                C
+              </span>
+              <span className="text-sm font-semibold text-ink">CampusOS</span>
+            </div>
+          )}
 
           <p className="text-[13px] font-medium tracking-wide text-ink-3 uppercase">{eyebrow}</p>
           <h1 className="mt-2 text-[28px] leading-tight font-semibold text-ink">{title}</h1>

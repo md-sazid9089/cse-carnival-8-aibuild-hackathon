@@ -75,7 +75,7 @@ export default function SignUp({ onNavigate, onSuccess }) {
       setAuth(res.user, res.token);
       toast(`Account created — welcome, ${res.user.name}`, "success");
       if (onSuccess) onSuccess(res.user);
-      else onNavigate?.("overview");
+      else onNavigate?.("/dashboard");
     } catch (err) {
       setFormError(err.message || "We couldn't create your account. Please try again.");
     } finally {
@@ -88,12 +88,13 @@ export default function SignUp({ onNavigate, onSuccess }) {
       eyebrow="Get started"
       title="Create your student account"
       subtitle={`For AUST students only. Sign up with your university email (${CAMPUS_EMAIL_EXAMPLE}) — your student ID and department are read from it.`}
+      onHome={() => onNavigate?.("/")}
       footer={
         <>
           Already have an account?{" "}
           <button
             type="button"
-            onClick={() => onNavigate?.("signin")}
+            onClick={() => onNavigate?.("/auth/signin")}
             className="font-medium text-accent underline-offset-2 hover:underline"
           >
             Sign in

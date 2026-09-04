@@ -40,7 +40,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
       setAuth(res.user, res.token);
       toast(`Welcome back, ${res.user.name}`, "success");
       if (onSuccess) onSuccess(res.user);
-      else onNavigate?.("overview");
+      else onNavigate?.("/dashboard");
     } catch (err) {
       setFormError(err.message || "We couldn't sign you in. Check your credentials and try again.");
     } finally {
@@ -53,12 +53,13 @@ export default function SignIn({ onNavigate, onSuccess }) {
       eyebrow="Welcome back"
       title="Sign in to CampusOS"
       subtitle={`For AUST students only. Use your university email (${CAMPUS_EMAIL_EXAMPLE}) or your Student ID.`}
+      onHome={() => onNavigate?.("/")}
       footer={
         <>
           New to CampusOS?{" "}
           <button
             type="button"
-            onClick={() => onNavigate?.("signup")}
+            onClick={() => onNavigate?.("/auth/signup")}
             className="font-medium text-accent underline-offset-2 hover:underline"
           >
             Create an account

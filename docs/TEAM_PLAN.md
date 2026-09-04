@@ -1,6 +1,6 @@
 # CampusOS — Team Plan (deadline: 8:30 PM, 4 Sep)
 
-Base scaffold is committed and runnable (see README "Run It" section). Everything below is refinement, hardening, and shipping. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first — it maps every choice to the marking rubric.
+ scaffold is committed and runnable (see README "Run It" section). Everything below is refinement, hardening, and shipping. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first — it maps every choice to the marking rubric.
 
 ## Who owns what
 

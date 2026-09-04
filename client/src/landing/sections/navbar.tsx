@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "../components/logo";
-import { APP_PATH, NAV_LINKS, SIGN_IN_PATH } from "../data/content";
+import { APP_PATH, NAV_LINKS, SIGN_IN_PATH, SIGN_UP_PATH } from "../data/content";
 import { scrollToHash, useNavigate } from "../hooks/use-navigate";
 
 export function Navbar() {
@@ -81,7 +81,7 @@ export function Navbar() {
           >
             Sign In
           </ButtonLink>
-          <Button size="sm" onClick={() => navigate(APP_PATH)}>
+          <Button size="sm" onClick={() => navigate(SIGN_UP_PATH)}>
             Get Started
           </Button>
         </div>
@@ -130,7 +130,7 @@ export function Navbar() {
               <Button variant="secondary" onClick={() => navigate(SIGN_IN_PATH)}>
                 Sign In
               </Button>
-              <Button onClick={() => navigate(APP_PATH)}>Get Started</Button>
+              <Button onClick={() => navigate(SIGN_UP_PATH)}>Get Started</Button>
             </div>
           </motion.div>
         )}
