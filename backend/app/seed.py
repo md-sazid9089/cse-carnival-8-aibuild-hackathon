@@ -66,13 +66,10 @@ def link_identities() -> None:
 
 
 def seed_rbac() -> bool:
-    """Seed roles, permissions, role-permission matrix, and seed users idempotently."""
-    roles = [
-        ("student", "Student", "Undergraduate / graduate student enrolled in university courses"),
-        ("teacher", "Teacher / Faculty", "Academic instructor, professor, or lab lecturer"),
-        ("authority", "Campus Authority", "Administrative staff, department head, or campus administration"),
-    ]
+    """Seed the permission catalogue and the demo student accounts idempotently.
 
+    Migration 004 dropped `roles`/`role_permissions`: every account is a student.
+    """
     permissions = [
         # schedules
         ("schedules:view", "View Schedules", "schedules", "View class routines and timetables"),
