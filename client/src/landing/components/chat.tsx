@@ -8,9 +8,11 @@ type BubbleProps = {
   children: React.ReactNode;
   className?: string;
   source?: string;
+  /** Set on the constant dark brand panel, where the light surfaces have no contrast. */
+  onDark?: boolean;
 };
 
-export function ChatBubble({ role, children, className, source }: BubbleProps) {
+export function ChatBubble({ role, children, className, source, onDark = false }: BubbleProps) {
   const isUser = role === "user";
   return (
     <motion.div
@@ -20,7 +22,12 @@ export function ChatBubble({ role, children, className, source }: BubbleProps) {
       className={cn("flex w-full gap-2.5", isUser ? "justify-end" : "justify-start", className)}
     >
       {!isUser && (
-        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-forest text-cream-50">
+        <span
+          className={cn(
+            "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg",
+            onDark ? "bg-white/12 text-brand-panel-ink" : "bg-ink text-ink-invert",
+          )}
+        >
           <Sparkles className="size-3.5" aria-hidden />
         </span>
       )}
@@ -28,14 +35,26 @@ export function ChatBubble({ role, children, className, source }: BubbleProps) {
         <div
           className={cn(
             "inline-block rounded-2xl px-3.5 py-2.5 text-left text-sm leading-relaxed",
-            isUser ? "rounded-br-md bg-forest-deep text-cream-50" : "rounded-bl-md bg-cream-100 text-forest-deep",
+            isUser ? "rounded-br-md" : "rounded-bl-md",
+            onDark
+              ? isUser
+                ? "bg-brand-panel-ink text-brand-panel"
+                : "bg-white/10 text-brand-panel-ink"
+              : isUser
+                ? "bg-ink text-ink-invert"
+                : "bg-surface-3 text-ink",
           )}
         >
           {children}
         </div>
         {source && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-moss">
-            <span className="inline-block size-1.5 rounded-full bg-moss" aria-hidden />
+          <div
+            className={cn(
+              "mt-1.5 flex items-center gap-1.5 text-[11px] font-medium",
+              onDark ? "text-brand-panel-ink/60" : "text-ink-3",
+            )}
+          >
+            <span className="inline-block size-1.5 rounded-full bg-accent" aria-hidden />
             {source}
           </div>
         )}
@@ -50,7 +69,7 @@ export function TypingDots({ className }: { className?: string }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="size-1.5 rounded-full bg-moss animate-pulse-dot"
+          className="size-1.5 rounded-full bg-ink-3 animate-pulse-dot"
           style={{ animationDelay: `${i * 0.18}s` }}
         />
       ))}

@@ -25,11 +25,11 @@ export function Trust() {
           <motion.li
             key={c.title}
             variants={staggerItem}
-            className="flex flex-col gap-4 rounded-3xl border border-cream-200 bg-white p-6 shadow-soft"
+            className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-xs"
           >
             <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-moss" aria-hidden />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-forest">{c.title}</h3>
+              <ShieldCheck className="size-4 text-positive" aria-hidden />
+              <h3 className="text-sm font-semibold tracking-wider uppercase text-ink-2">{c.title}</h3>
             </div>
             <ChatBubble role="user">{c.user}</ChatBubble>
             <ChatBubble role="ai">{c.ai}</ChatBubble>

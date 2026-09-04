@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { api, setAuth, toast } from "../api.js";
 import AuthLayout from "../components/AuthLayout.jsx";
 import { Button, Field, TextInput } from "../components/ui.jsx";
+import { CAMPUS_DOMAIN, CAMPUS_EMAIL_EXAMPLE, isCampusEmail } from "../lib/aust.js";
 
 export default function SignIn({ onNavigate, onSuccess }) {
   const [values, setValues] = useState({ ident: "", password: "" });
@@ -21,7 +22,10 @@ export default function SignIn({ onNavigate, onSuccess }) {
     if (loading) return;
 
     const next = {};
-    if (!values.ident.trim()) next.ident = "Enter your email address or Student ID.";
+    const ident = values.ident.trim();
+    if (!ident) next.ident = `Enter your AUST email (@${CAMPUS_DOMAIN}) or Student ID.`;
+    else if (ident.includes("@") && !isCampusEmail(ident))
+      next.ident = `CampusOS is for AUST students only — use your @${CAMPUS_DOMAIN} address.`;
     if (!values.password) next.password = "Enter your password.";
     setErrors(next);
     setFormError(null);
@@ -48,7 +52,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
     <AuthLayout
       eyebrow="Welcome back"
       title="Sign in to CampusOS"
-      subtitle="Use the email address or Student ID your department has on file."
+      subtitle={`For AUST students only. Use your university email (${CAMPUS_EMAIL_EXAMPLE}) or your Student ID.`}
       onHome={() => onNavigate?.("/")}
       footer={
         <>
@@ -72,14 +76,14 @@ export default function SignIn({ onNavigate, onSuccess }) {
           ) : null}
         </div>
 
-        <Field label="Email or Student ID" htmlFor="signin-ident" required error={errors.ident}>
+        <Field label="AUST email or Student ID" htmlFor="signin-ident" required error={errors.ident}>
           {({ describedBy }) => (
             <TextInput
               id="signin-ident"
               ref={identRef}
               value={values.ident}
               onChange={set("ident")}
-              placeholder="your university email or student ID"
+              placeholder={CAMPUS_EMAIL_EXAMPLE}
               autoComplete="username"
               autoFocus
               invalid={Boolean(errors.ident)}

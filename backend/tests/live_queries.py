@@ -30,7 +30,7 @@ only = sys.argv[1] if len(sys.argv) > 1 else None
 client = httpx.Client(base_url=B, timeout=180)
 
 # The agent endpoint needs a session. Sign in if the harness account exists, else register it.
-EMAIL = os.getenv("CAMPUSOS_EMAIL", "live.rubric@aust.edu")
+EMAIL = os.getenv("CAMPUSOS_EMAIL", "live.cse.20250001@aust.edu")
 PW = os.getenv("CAMPUSOS_PW", "live-rubric-pass")
 res = client.post("/api/auth/signin", json={"email_or_id": EMAIL, "password": PW})
 if res.status_code != 200:
@@ -42,6 +42,7 @@ client.headers["Authorization"] = f"Bearer {token}"
 print(f"signed in as {who['name']} ({who['student_id']})")
 
 conversation = None
+not_model: list[str] = []
 
 for kind, q in QUERIES:
     if only and kind != only:
@@ -55,6 +56,8 @@ for kind, q in QUERIES:
         continue
     d = r.json()
     conversation = d.get("conversation_id") or conversation
+    if d.get("agent") != "assistant":
+        not_model.append(f"[{kind}] {q} -> {d.get('agent')}")
     calls = ", ".join(f"{c['tool']}{'' if c['ok'] else '(FAILED)'}" for c in d.get("tool_calls", []))
     print(f"\n[{kind}] {q}")
     print(f"  tools: {calls or '(none)'}")
@@ -63,3 +66,11 @@ for kind, q in QUERIES:
     for c in d.get("tool_calls", []):
         if not c.get("ok"):
             print(f"  REFUSAL: {json.dumps(c)[:300]}")
+
+# A turn the fallback answered proves nothing about the agent - refusals and guardrails included.
+if not_model:
+    print("\nWARNING: these turns never reached the model:")
+    for line in not_model:
+        print("  " + line)
+    sys.exit(1)
+print("\nevery turn was answered by the model")

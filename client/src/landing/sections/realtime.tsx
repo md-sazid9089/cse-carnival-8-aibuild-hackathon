@@ -20,7 +20,7 @@ function Connector({ active, vertical = false }: { active: boolean; vertical?: b
     <svg
       aria-hidden
       viewBox={vertical ? "0 0 12 64" : "0 0 64 12"}
-      className={cn("text-cream-200", vertical ? "mx-auto h-12 w-3" : "h-3 w-full")}
+      className={cn("text-line-strong", vertical ? "mx-auto h-12 w-3" : "h-3 w-full")}
       preserveAspectRatio="none"
     >
       <path
@@ -32,7 +32,7 @@ function Connector({ active, vertical = false }: { active: boolean; vertical?: b
       />
       <motion.path
         d={vertical ? "M6 0 V64" : "M0 6 H64"}
-        stroke="#B97861"
+        stroke="var(--accent)"
         strokeWidth="2.5"
         fill="none"
         strokeLinecap="round"
@@ -48,15 +48,15 @@ function Column({ icon: Icon, title, active, children }: { icon: typeof Database
   return (
     <div
       className={cn(
-        "flex h-full flex-col rounded-3xl border bg-white p-5 shadow-soft transition-[border-color,box-shadow] duration-300",
-        active ? "border-terracotta/60 shadow-lift" : "border-cream-200",
+        "flex h-full flex-col rounded-2xl border bg-surface p-5 shadow-xs transition-[border-color,box-shadow] duration-300",
+        active ? "border-accent/50 shadow-md" : "border-line",
       )}
     >
       <div className="mb-4 flex items-center gap-2.5">
-        <span className={cn("grid size-8 place-items-center rounded-xl text-cream-50 transition-colors", active ? "bg-terracotta" : "bg-forest-deep")}>
+        <span className={cn("grid size-8 place-items-center rounded-lg text-ink-invert transition-colors", active ? "bg-accent" : "bg-ink")}>
           <Icon className="size-4" aria-hidden />
         </span>
-        <p className="text-sm font-semibold text-forest-deep">{title}</p>
+        <p className="text-sm font-semibold text-ink">{title}</p>
       </div>
       <div className="flex-1">{children}</div>
     </div>
@@ -85,16 +85,16 @@ export function Realtime() {
     >
       <div ref={ref} className="grid items-stretch gap-2 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
         <Column icon={LayoutDashboard} title="Dashboard" active={phase === 1}>
-          <div className="rounded-2xl border border-cream-200 bg-cream-50 p-3.5">
+          <div className="rounded-xl border border-line bg-surface-2 p-3.5">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Announcement · ann-012</p>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-ink-3">Announcement · ann-012</p>
               <AnimatePresence>
                 {phase === 1 && (
                   <motion.span
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center gap-1 rounded-full bg-peach/60 px-2 py-0.5 text-[10px] font-semibold text-terracotta-deep"
+                    className="flex items-center gap-1 rounded-md bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent-ink"
                   >
                     <Pencil className="size-3" aria-hidden /> editing
                   </motion.span>
@@ -107,14 +107,14 @@ export function Realtime() {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                className="mt-2 text-sm font-semibold text-forest-deep"
+                className="mt-2 text-sm font-semibold text-ink"
               >
                 {moved ? "CSE321 moved to Room 304 at 2:00 PM." : "CSE321 class cancelled."}
               </motion.p>
             </AnimatePresence>
-            <p className="mt-1 text-xs text-ink-muted">Posted by CSE Department · High priority</p>
+            <p className="mt-1 text-xs text-ink-3">Posted by CSE Department · High priority</p>
           </div>
-          <p className="mt-3 text-xs text-ink-muted">
+          <p className="mt-3 text-xs text-ink-3">
             {phase === 0 && "The original notice."}
             {phase === 1 && "An admin corrects it."}
             {phase >= 2 && "Saved. No refresh needed anywhere."}
@@ -126,16 +126,16 @@ export function Realtime() {
 
         <Column icon={Database} title="Backend" active={phase === 2}>
           <div className="space-y-2 font-mono text-[11px]">
-            <div className="rounded-xl bg-forest-deep p-3 text-cream-50">
-              <p className="text-sage">PUT /api/announcements/ann-012</p>
+            <div className="rounded-lg bg-brand-panel p-3 text-brand-panel-ink">
+              <p className="text-brand-panel-ink/60">PUT /api/announcements/ann-012</p>
               <p className="mt-1">{moved ? '{ "body": "CSE321 moved to Room 304 at 2:00 PM." }' : "…"}</p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-cream-50 p-3 text-forest">
-              <span className={cn("size-2 rounded-full", moved ? "bg-moss" : "bg-cream-200")} />
+            <div className="flex items-center gap-2 rounded-lg bg-surface-2 p-3 text-ink-2">
+              <span className={cn("size-2 rounded-full", moved ? "bg-positive" : "bg-surface-3")} />
               {moved ? "committed · SSE broadcast → every tab" : "awaiting change"}
             </div>
           </div>
-          <p className="mt-3 text-xs text-ink-muted">One Postgres row. The single source of truth.</p>
+          <p className="mt-3 text-xs text-ink-3">One Postgres row. The single source of truth.</p>
         </Column>
 
         <div className="hidden items-center lg:flex"><Connector active={phase >= 4} /></div>
@@ -154,13 +154,13 @@ export function Realtime() {
                 CSE321 has been moved to Room 304 today at 2:00 PM.
               </ChatBubble>
             )}
-            {phase < 3 && <p className="text-xs text-ink-muted">Waiting for a question…</p>}
+            {phase < 3 && <p className="text-xs text-ink-3">Waiting for a question…</p>}
           </div>
         </Column>
       </div>
 
-      <p className="mt-10 text-center text-sm text-ink-muted">
-        Judges can edit any record mid-conversation. <span className="font-semibold text-forest-deep">The very next answer reflects it.</span>
+      <p className="mt-10 text-center text-sm text-ink-2">
+        Judges can edit any record mid-conversation. <span className="font-semibold text-ink">The very next answer reflects it.</span>
       </p>
     </Section>
   );

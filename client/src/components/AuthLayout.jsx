@@ -1,4 +1,5 @@
 import { Calendar, Door, Sparkle } from "../lib/icons.jsx";
+import { CAMPUS_DOMAIN } from "../lib/aust.js";
 
 const PROOF = [
   { icon: Sparkle, title: "Ask, don't dig", body: "“Am I free Thursday at 2?” beats clicking through five timetables." },
@@ -49,8 +50,8 @@ export default function AuthLayout({ eyebrow, title, subtitle, children, footer,
             answered in a sentence.
           </p>
           <p className="mt-5 text-[15px] leading-relaxed opacity-70">
-            Ahsanullah University of Science and Technology — schedules, rooms, assignments and events, backed by an
-            assistant that reads the live database on every question.
+            Built only for students of Ahsanullah University of Science and Technology — schedules, rooms, assignments
+            and events, backed by an assistant that reads the live database on every question.
           </p>
 
           <ul className="mt-10 space-y-5">
@@ -96,6 +97,11 @@ export default function AuthLayout({ eyebrow, title, subtitle, children, footer,
           <p className="text-[13px] font-medium tracking-wide text-ink-3 uppercase">{eyebrow}</p>
           <h1 className="mt-2 text-[28px] leading-tight font-semibold text-ink">{title}</h1>
           {subtitle ? <p className="mt-2 text-sm leading-relaxed text-ink-2">{subtitle}</p> : null}
+
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-ink-2">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+            AUST students only · @{CAMPUS_DOMAIN} accounts
+          </p>
 
           <div className="mt-8">{children}</div>
 

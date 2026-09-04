@@ -14,10 +14,10 @@ function Preview({ id }: { id: CampusSystem["id"] }) {
             ["11:00", "CSE 4129", "7A03"],
             ["14:00", "IPE 4111", "7C01"],
           ].map(([t, c, r]) => (
-            <div key={c} className="flex items-center gap-2 rounded-lg bg-cream-50 px-2.5 py-1.5 text-[11px]">
-              <span className="font-mono text-ink-muted">{t}</span>
-              <span className="font-semibold text-forest-deep">{c}</span>
-              <span className="ml-auto rounded bg-sage/30 px-1.5 font-mono text-forest">{r}</span>
+            <div key={c} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[11px]">
+              <span className="font-mono text-ink-3">{t}</span>
+              <span className="font-semibold text-ink">{c}</span>
+              <span className="ml-auto rounded bg-surface-3 px-1.5 font-mono text-ink-2">{r}</span>
             </div>
           ))}
         </div>
@@ -26,33 +26,33 @@ function Preview({ id }: { id: CampusSystem["id"] }) {
       return (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="font-semibold text-forest-deep">7B03 · Lab</span>
-            <span className="text-ink-muted">30 seats</span>
+            <span className="font-semibold text-ink">7B03 · Lab</span>
+            <span className="text-ink-3">30 seats</span>
           </div>
           <div className="flex gap-1">
             {Array.from({ length: 12 }).map((_, i) => (
-              <span key={i} className={cn("h-5 flex-1 rounded-sm", i < 4 || i > 8 ? "bg-sage/40" : "bg-terracotta/70")} />
+              <span key={i} className={cn("h-5 flex-1 rounded-sm", i < 4 || i > 8 ? "bg-surface-3" : "bg-accent/60")} />
             ))}
           </div>
           <div className="flex gap-1.5 text-[10px]">
             {["projector", "AC", "whiteboard"].map((e) => (
-              <span key={e} className="rounded-full bg-cream-100 px-2 py-0.5 text-forest">{e}</span>
+              <span key={e} className="rounded-md bg-surface-3 px-2 py-0.5 text-ink-2">{e}</span>
             ))}
           </div>
         </div>
       );
     case "events":
       return (
-        <div className="rounded-lg bg-cream-50 p-2.5">
-          <p className="text-[11px] font-semibold text-forest-deep">Deep Learning guest lecture</p>
-          <p className="text-[10px] text-ink-muted">Sun · 12:30 · 7C02</p>
+        <div className="rounded-lg bg-surface-2 p-2.5">
+          <p className="text-[11px] font-semibold text-ink">Deep Learning guest lecture</p>
+          <p className="text-[10px] text-ink-3">Sun · 12:30 · 7C02</p>
           <div className="mt-2 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-cream-200">
-              <div className="h-full w-[78%] rounded-full bg-moss" />
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full w-[78%] rounded-full bg-accent" />
             </div>
-            <span className="text-[10px] text-ink-muted">47/60</span>
+            <span className="text-[10px] text-ink-3">47/60</span>
           </div>
-          <span className="mt-2 inline-block rounded-full bg-forest-deep px-2.5 py-1 text-[10px] font-semibold text-cream-50">
+          <span className="mt-2 inline-block rounded-md bg-ink px-2.5 py-1 text-[10px] font-semibold text-ink-invert">
             Register
           </span>
         </div>
@@ -64,16 +64,16 @@ function Preview({ id }: { id: CampusSystem["id"] }) {
             ["high", "CSE 4113 rescheduled to 3:30 PM"],
             ["medium", "Library hours extended"],
           ].map(([p, t]) => (
-            <div key={t} className="flex items-start gap-2 rounded-lg bg-cream-50 px-2.5 py-1.5">
+            <div key={t} className="flex items-start gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
               <span
                 className={cn(
-                  "mt-0.5 rounded-full px-1.5 text-[9px] font-bold uppercase",
-                  p === "high" ? "bg-peach/70 text-terracotta-deep" : "bg-sage/40 text-forest",
+                  "mt-0.5 rounded px-1.5 text-[9px] font-semibold uppercase",
+                  p === "high" ? "bg-critical-soft text-critical" : "bg-caution-soft text-caution",
                 )}
               >
                 {p}
               </span>
-              <span className="text-[11px] text-forest-deep">{t}</span>
+              <span className="text-[11px] text-ink">{t}</span>
             </div>
           ))}
         </div>
@@ -87,9 +87,9 @@ function Preview({ id }: { id: CampusSystem["id"] }) {
               ["ML assignment 2", "Due Sun", false],
             ] as Array<[string, string, boolean]>
           ).map(([t, d, soon]) => (
-            <div key={t} className="flex items-center justify-between rounded-lg bg-cream-50 px-2.5 py-1.5 text-[11px]">
-              <span className="text-forest-deep">{t}</span>
-              <span className={cn("font-semibold", soon ? "text-terracotta" : "text-ink-muted")}>{d}</span>
+            <div key={t} className="flex items-center justify-between rounded-lg bg-surface-2 px-2.5 py-1.5 text-[11px]">
+              <span className="text-ink">{t}</span>
+              <span className={cn("font-semibold", soon ? "text-accent" : "text-ink-3")}>{d}</span>
             </div>
           ))}
         </div>
@@ -104,7 +104,7 @@ export function CampusSystems() {
       eyebrow="One platform"
       title={
         <>
-          One platform. <span className="text-terracotta">Five</span> campus systems.
+          One platform. <span className="text-accent">Five</span> campus systems.
         </>
       }
       description="Everything a student needs to know about their week, managed in one place and kept honest by a single database."
@@ -123,25 +123,25 @@ export function CampusSystems() {
             whileHover={{ y: -4 }}
             transition={{ type: "spring", stiffness: 300, damping: 24 }}
             className={cn(
-              "group flex flex-col rounded-3xl border border-cream-200 bg-white p-6 shadow-soft transition-shadow hover:shadow-lift",
+              "group flex flex-col rounded-2xl border border-line bg-surface p-6 shadow-xs transition-shadow hover:shadow-md",
               i === 0 && "lg:col-span-1",
             )}
           >
             <div className="mb-4 flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-forest-deep text-cream-50 transition-colors group-hover:bg-terracotta">
+              <span className="grid size-10 place-items-center rounded-lg bg-ink text-ink-invert transition-colors group-hover:bg-accent">
                 <s.icon className="size-5" aria-hidden />
               </span>
-              <h3 className="text-lg font-semibold text-forest-deep">{s.title}</h3>
+              <h3 className="text-lg font-semibold text-ink">{s.title}</h3>
             </div>
-            <p className="text-sm leading-relaxed text-ink-muted">{s.description}</p>
-            <div className="mt-5 rounded-2xl border border-cream-200 bg-cream-50/60 p-3">
+            <p className="text-sm leading-relaxed text-ink-2">{s.description}</p>
+            <div className="mt-5 rounded-xl border border-line bg-canvas p-3">
               <Preview id={s.id} />
             </div>
           </motion.li>
         ))}
-        <li className="flex flex-col justify-center rounded-3xl border border-dashed border-sage/70 bg-cream-100/50 p-6 text-sm text-forest">
-          <p className="font-display text-xl font-semibold text-forest-deep">Add, edit, delete — instantly.</p>
-          <p className="mt-2 leading-relaxed text-ink-muted">
+        <li className="flex flex-col justify-center rounded-2xl border border-dashed border-line-strong bg-surface-2 p-6 text-sm text-ink-2">
+          <p className="text-xl font-semibold tracking-tight text-ink">Add, edit, delete — instantly.</p>
+          <p className="mt-2 leading-relaxed text-ink-2">
             Every change is saved to the backend and pushed live to every open tab. Reload, come back tomorrow, ask the
             agent — it’s the same truth everywhere.
           </p>

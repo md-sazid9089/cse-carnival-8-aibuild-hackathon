@@ -25,25 +25,25 @@ export function Comparison() {
             key={col.title}
             variants={staggerItem}
             className={cn(
-              "flex flex-col rounded-3xl border p-6",
+              "flex flex-col rounded-2xl border p-6",
               col.highlight
-                ? "border-forest-deep bg-forest-deep text-cream-50 shadow-lift lg:-my-4 lg:py-10"
-                : "border-cream-200 bg-white text-forest-deep shadow-soft",
+                ? "border-brand-panel bg-brand-panel text-brand-panel-ink shadow-lg lg:-my-4 lg:py-10"
+                : "border-line bg-surface text-ink shadow-xs",
             )}
           >
-            <h3 className={cn("font-display text-2xl font-semibold", col.highlight && "text-cream-50")}>{col.title}</h3>
+            <h3 className="text-xl font-semibold tracking-tight">{col.title}</h3>
             <ul className="mt-6 space-y-3">
               {col.items.map((item) => (
                 <li key={item} className="flex items-start gap-3 text-sm">
                   <span
                     className={cn(
                       "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full",
-                      col.highlight ? "bg-terracotta text-cream-50" : "bg-cream-100 text-ink-muted",
+                      col.highlight ? "bg-accent text-ink-invert" : "bg-surface-3 text-ink-3",
                     )}
                   >
                     {col.highlight ? <Check className="size-3" aria-hidden /> : <Minus className="size-3" aria-hidden />}
                   </span>
-                  <span className={col.highlight ? "text-cream-50" : "text-forest"}>{item}</span>
+                  <span className={col.highlight ? "text-brand-panel-ink/85" : "text-ink-2"}>{item}</span>
                 </li>
               ))}
             </ul>

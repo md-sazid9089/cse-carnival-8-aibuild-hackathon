@@ -137,7 +137,10 @@ function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
 }
 
 export default function Schedules({ initialQuery = "" }) {
-  const { data, error, staleError, loading, refreshing, refresh } = useApi(config.endpoint);
+  const [scope, setScope] = useState("all");
+  const { data, error, staleError, loading, refreshing, refresh } = useApi(
+    scope === "mine" ? `${config.endpoint}?mine=1` : config.endpoint,
+  );
   const { today, weekday, nowTime } = useCampus();
   const [view, setView] = useState(initialQuery ? "table" : "timetable");
   const [query, setQuery] = useState(initialQuery);
@@ -182,6 +185,15 @@ export default function Schedules({ initialQuery = "" }) {
             <>
               <ResultCount shown={filtered.length} total={data?.length ?? 0} noun="classes" />
               <LiveDot active={refreshing} />
+              <Segmented
+                label="Whose classes"
+                value={scope}
+                onChange={setScope}
+                options={[
+                  { value: "all", label: "All classes" },
+                  { value: "mine", label: "My classes" },
+                ]}
+              />
               <Segmented
                 label="Schedule view"
                 value={view}

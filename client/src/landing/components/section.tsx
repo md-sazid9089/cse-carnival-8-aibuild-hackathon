@@ -17,9 +17,9 @@ type SectionProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
 };
 
 const tones = {
-  light: "bg-cream-50 text-forest-deep",
-  cream: "bg-cream-100/60 text-forest-deep",
-  dark: "bg-forest-deep text-cream-50",
+  light: "bg-canvas text-ink",
+  cream: "bg-surface-2 text-ink",
+  dark: "bg-brand-panel text-brand-panel-ink",
 };
 
 export function Section({
@@ -41,21 +41,21 @@ export function Section({
           {eyebrow && (
             <p
               className={cn(
-                "mb-4 text-xs font-bold uppercase tracking-[0.18em]",
-                tone === "dark" ? "text-sage" : "text-terracotta",
+                "mb-4 text-xs font-semibold tracking-[0.18em] uppercase",
+                tone === "dark" ? "text-brand-panel-ink/60" : "text-accent",
               )}
             >
               {eyebrow}
             </p>
           )}
-          <h2 className="font-display text-[2rem] font-semibold leading-[1.08] tracking-tight sm:text-[2.75rem]">
+          <h2 className="text-[2rem] leading-[1.08] font-semibold tracking-tight sm:text-[2.75rem]">
             {title}
           </h2>
           {description && (
             <p
               className={cn(
                 "mt-5 text-base leading-relaxed sm:text-lg",
-                tone === "dark" ? "text-sage" : "text-ink-muted",
+                tone === "dark" ? "text-brand-panel-ink/70" : "text-ink-2",
               )}
             >
               {description}

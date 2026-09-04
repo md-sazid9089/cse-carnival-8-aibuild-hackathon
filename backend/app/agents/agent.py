@@ -51,6 +51,27 @@ def _messages(profile: dict, history: list[dict], user_msg: str) -> list[dict]:
     return msgs
 
 
+def _signature(call: dict) -> str:
+    fn = call.get("function") or {}
+    return f"{fn.get('name')}|{fn.get('arguments')}"
+
+
+def _from_trace(trace: list[dict]) -> str | None:
+    """Answer from what the tools already returned, for when the model won't finish the job."""
+    facts = [t["summary"] for t in trace if t.get("ok") and t.get("summary")]
+    if not facts:
+        return None
+    return "Here's what I found: " + "; ".join(dict.fromkeys(facts)) + "."
+
+
+def _presentable(reply: str | None) -> bool:
+    """Weak models sometimes emit a stray '[' or a bare JSON fragment instead of an answer."""
+    text = (reply or "").strip()
+    if len(text) < 12:
+        return False
+    return not (text[0] in "[{" and text[-1] not in "]}")
+
+
 async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = None,
                    emit=None) -> dict:
     """Execute one user turn. `emit` is an optional async callback for streaming events."""
@@ -94,17 +115,32 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
     trace: list[dict] = []
     deadline = time.monotonic() + config.AGENT_TURN_BUDGET_S
     reply: str | None = None
+    models_override: list[str] | None = None
+    needs_tool = False   # the first hop demanded a tool call, so an answer without one is ungrounded
+    retried_toolless = False
+    seen: set[str] = set()
 
     for hop in range(config.AGENT_MAX_ITERATIONS):
         if time.monotonic() > deadline:
-            reply = _write_summary(trace) or ("That took longer than expected. "
-                                              "I checked: " + ", ".join(t["label"] for t in trace) +
-                                              ". Please ask again." if trace else BUSY)
+            done = _write_summary(trace)
+            if done:
+                reply = done
+                break
+            # Out of time on a read question: answer from the database rather than stalling.
+            slow = degraded.answer(user_msg, profile, note="slow") if config.AGENT_DEGRADED_MODE else None
+            if slow:
+                await _persist(cid, profile, user_msg, slow["reply"], slow["tool_calls"])
+                return {**slow, "conversation_id": cid, "agent": "degraded",
+                        "tool_calls": slow["tool_calls"]}
+            reply = ("That took longer than expected. I checked: " +
+                     ", ".join(t["label"] for t in trace) + ". Please ask again.") if trace else BUSY
             break
-        tools, choice = tools_for(user_msg, first_hop=(hop == 0))
+        tools, choice = tools_for(user_msg, first_hop=(hop == 0 or retried_toolless))
+        if hop == 0:
+            needs_tool = choice == "required"
         await send("status", {"text": "Thinking…" if hop == 0 else "Working on it…"})
         try:
-            res = await _call(messages, tools, choice, emit=send)
+            res = await _call(messages, tools, choice, emit=send, models=models_override)
         except LLMError as exc:
             done = _write_summary(trace)
             if done:  # a write already happened: never re-ask another provider
@@ -122,12 +158,31 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
         msg = res["message"]
         calls = msg.get("tool_calls") or []
         if not calls:
+            # Some free models ignore tool_choice='required' and answer from memory. A data question
+            # answered without reading the database is a wrong answer, so try the rest of the chain,
+            # then fall back to live data rather than trusting the model's recollection.
+            if needs_tool and not trace:
+                others = [m for m in gateway.models if m != res.get("model")]
+                if others and not retried_toolless:
+                    retried_toolless = True
+                    models_override = others
+                    continue
+                grounded = degraded.answer(user_msg, profile, note="grounded") if config.AGENT_DEGRADED_MODE else None
+                if grounded:
+                    await _persist(cid, profile, user_msg, grounded["reply"], grounded["tool_calls"])
+                    return {**grounded, "conversation_id": cid, "agent": "degraded",
+                            "tool_calls": grounded["tool_calls"]}
             reply = (msg.get("content") or "").strip() or _write_summary(trace) or \
                 "I couldn't put an answer together — could you rephrase?"
             break
 
         messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
+        if calls and all(_signature(c) in seen for c in calls):
+            # the model is asking for data it already has: answer instead of burning another hop
+            reply = _write_summary(trace) or _from_trace(trace)
+            break
         for call in calls:
+            seen.add(_signature(call))
             name = (call.get("function") or {}).get("name", "?")
             await send("tool_call", {"tool": name, "label": _label(name)})
         results = await dispatch_many(calls, ctx)
@@ -143,6 +198,9 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
         reply = _write_summary(trace) or "I ran out of steps on that one — please ask again more specifically."
 
     reply = reply or "Sorry, I couldn't answer that."
+    if not _presentable(reply):
+        reply = _write_summary(trace) or _from_trace(trace) or \
+            "I couldn't put that into words — could you ask again?"
     for pending in ctx.get("proposals", []):
         await send("action_proposed", pending)
     await _persist(cid, profile, user_msg, reply, trace)
@@ -150,11 +208,11 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
             "proposals": ctx.get("proposals", [])}
 
 
-async def _call(messages, tools, choice, emit) -> dict:
+async def _call(messages, tools, choice, emit, models=None) -> dict:
     """Streaming call with token pass-through; falls back to a buffered call if streaming fails."""
     buffer: list[str] = []
     try:
-        async for kind, payload in gateway.stream(messages, tools, choice):
+        async for kind, payload in gateway.stream(messages, tools, choice, models):
             if kind == "token":
                 buffer.append(payload)
                 await emit("token", payload)
@@ -171,8 +229,8 @@ async def _call(messages, tools, choice, emit) -> dict:
     except LLMError:
         if buffer:
             raise
-        return await gateway.complete(messages, tools, choice)
-    return await gateway.complete(messages, tools, choice)
+        return await gateway.complete(messages, tools, choice, models)
+    return await gateway.complete(messages, tools, choice, models)
 
 
 async def _persist(cid: str, profile: dict, user_msg: str, reply: str, trace: list[dict]) -> None:

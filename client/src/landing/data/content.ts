@@ -14,10 +14,10 @@ import {
 } from "lucide-react";
 
 export const NAV_LINKS = [
-  { label: "Product", href: "#product" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
+  { label: "Problem", href: "#problem" },
   { label: "AI Agent", href: "#ai-agent" },
+  { label: "Live Data", href: "#realtime" },
+  { label: "Trust", href: "#trust" },
 ] as const;
 
 export const APP_PATH = "/dashboard";
@@ -45,11 +45,11 @@ export const CAMPUS_SYSTEMS: CampusSystem[] = [
 ];
 
 export const SCATTERED_SOURCES = [
-  { label: "Group chat", detail: "“anyone know if CSE321 is on today??”", tint: "bg-white" },
-  { label: "Spreadsheet", detail: "routine_v3_FINAL(2).xlsx", tint: "bg-cream-100" },
-  { label: "Notice board", detail: "Pinned 3 weeks ago", tint: "bg-peach/50" },
-  { label: "Class schedule", detail: "Photo of a photo of a PDF", tint: "bg-sage/30" },
-  { label: "Event poster", detail: "Seen once in a hallway", tint: "bg-white" },
+  { label: "Group chat", detail: "“anyone know if CSE321 is on today??”", tint: "bg-surface" },
+  { label: "Spreadsheet", detail: "routine_v3_FINAL(2).xlsx", tint: "bg-surface-2" },
+  { label: "Notice board", detail: "Pinned 3 weeks ago", tint: "bg-accent-soft" },
+  { label: "Class schedule", detail: "Photo of a photo of a PDF", tint: "bg-surface-3" },
+  { label: "Event poster", detail: "Seen once in a hallway", tint: "bg-surface" },
 ] as const;
 
 export type Conversation = {
@@ -210,9 +210,9 @@ export const RELIABILITY = [
 
 export const FOOTER_LINKS = [
   { label: "Product", href: "#product" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
   { label: "AI Agent", href: "#ai-agent" },
+  { label: "Live Data", href: "#realtime" },
+  { label: "Trust", href: "#trust" },
   { label: "GitHub", href: "https://github.com", external: true },
   { label: "Contact", href: "mailto:hello@campusos.app" },
 ] as const;

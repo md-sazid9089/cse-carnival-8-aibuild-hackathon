@@ -3,21 +3,20 @@ import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes } from
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-[background-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta focus-visible:ring-offset-2 focus-visible:ring-offset-cream-50 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,color,box-shadow,transform] duration-150 ease-out disabled:pointer-events-none disabled:opacity-45 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        primary: "bg-forest-deep text-cream-50 shadow-soft hover:bg-forest hover:shadow-lift",
-        secondary:
-          "bg-white text-forest-deep border border-cream-200 shadow-soft hover:border-sage hover:bg-cream-50",
-        accent: "bg-terracotta text-white shadow-soft hover:bg-terracotta-deep hover:shadow-lift",
-        ghost: "text-forest hover:bg-cream-100 hover:text-forest-deep",
-        inverted: "bg-cream-50 text-forest-deep hover:bg-white",
+        primary: "bg-ink text-ink-invert shadow-xs hover:bg-ink/88",
+        secondary: "bg-surface text-ink border border-line-control shadow-xs hover:bg-surface-2",
+        accent: "bg-accent text-ink-invert shadow-xs hover:bg-accent-hover",
+        ghost: "text-ink-2 hover:bg-surface-3 hover:text-ink",
+        inverted: "bg-brand-panel-ink text-brand-panel hover:opacity-90",
       },
       size: {
-        sm: "h-9 px-4 text-sm",
-        md: "h-11 px-5 text-sm",
-        lg: "h-12 px-6 text-base",
+        sm: "h-9 rounded-lg px-3.5 text-[13px]",
+        md: "h-10 rounded-lg px-4 text-sm",
+        lg: "h-11 rounded-xl px-5 text-sm",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },

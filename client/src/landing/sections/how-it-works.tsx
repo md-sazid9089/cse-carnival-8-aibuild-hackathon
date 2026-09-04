@@ -25,15 +25,15 @@ export function HowItWorks() {
           whileInView={{ scaleX: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 1, ease: "easeInOut", delay: 0.3 }}
-          className="absolute left-[16.6%] right-[16.6%] top-7 hidden h-px origin-left bg-gradient-to-r from-sage via-terracotta to-sage md:block"
+          className="absolute top-7 right-[16.6%] left-[16.6%] hidden h-px origin-left bg-gradient-to-r from-line via-accent to-line md:block"
         />
         {HOW_IT_WORKS.map((s) => (
           <motion.li key={s.step} variants={staggerItem} className="relative flex flex-col items-center text-center">
-            <span className="relative z-10 grid size-14 place-items-center rounded-full border-4 border-cream-50 bg-forest-deep font-display text-lg font-semibold text-cream-50 shadow-soft">
+            <span className="relative z-10 grid size-14 place-items-center rounded-full border-4 border-canvas bg-ink text-lg font-semibold text-ink-invert shadow-xs">
               {s.step}
             </span>
-            <h3 className="mt-5 font-display text-2xl font-semibold text-forest-deep">{s.title}</h3>
-            <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-muted">{s.description}</p>
+            <h3 className="mt-5 text-xl font-semibold tracking-tight text-ink">{s.title}</h3>
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-2">{s.description}</p>
           </motion.li>
         ))}
       </motion.ol>

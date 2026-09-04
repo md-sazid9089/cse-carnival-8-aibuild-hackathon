@@ -22,12 +22,12 @@
 
 ## 📖 Project Overview
 
-**CampusOS** puts a student's entire campus life in one place: **class schedules**, **rooms** (with booking), **events** (with registration), **announcements**, and **assignment deadlines**. Every record lives in PostgreSQL — the seed JSON is loaded into the database once on first boot and never read again — so adding, editing, or deleting anything through the dashboard persists across reloads. On top of that dashboard sits an **AI agent with real OpenAI-standard function calling**: it answers questions *and* takes actions by invoking typed tools that read and write the very same database, through the very same service layer, as the REST API. **Nothing is cached** — every tool call queries Postgres at call time, so editing a record in the dashboard changes the agent's answer on the very next message. The agent runs as a single tool-calling loop over 16 tools; writes go through a propose-then-confirm protocol, and authorization, capacity, and booking-conflict rules are enforced server-side (a database `EXCLUDE` constraint is the final word on double-booking), so no clever phrasing can talk the agent past them.
+**CampusOS** puts a student's entire campus life in one place: **class schedules**, **rooms** (with booking), **events** (with registration), **announcements**, and **assignment deadlines**. Every record lives in PostgreSQL — the seed JSON is loaded into the database once on first boot and never read again — so adding, editing, or deleting anything through the dashboard persists across reloads. On top of that dashboard sits an **AI agent with real OpenAI-standard function calling**: it answers questions _and_ takes actions by invoking typed tools that read and write the very same database, through the very same service layer, as the REST API. **Nothing is cached** — every tool call queries Postgres at call time, so editing a record in the dashboard changes the agent's answer on the very next message. The agent runs as a single tool-calling loop over 16 tools; writes go through a propose-then-confirm protocol, and authorization, capacity, and booking-conflict rules are enforced server-side (a database `EXCLUDE` constraint is the final word on double-booking), so no clever phrasing can talk the agent past them.
 
 <div align="center">
 
-| 🗓️ Schedules | 🚪 Rooms | 🎪 Events | 📢 Announcements | 📝 Assignments |
-|:---:|:---:|:---:|:---:|:---:|
+|         🗓️ Schedules         |               🚪 Rooms                |             🎪 Events             |          📢 Announcements          |     📝 Assignments     |
+| :--------------------------: | :-----------------------------------: | :-------------------------------: | :--------------------------------: | :--------------------: |
 | Weekly timetable<br/>Sun–Thu | Browse, filter,<br/>**book & cancel** | Browse,<br/>**register & cancel** | Priority notices<br/>& reschedules | Deadlines<br/>& status |
 
 </div>
@@ -36,18 +36,18 @@
 
 ## 🧰 Tech Stack
 
-| Layer | Choice |
-| --- | --- |
-| **Language** | Python 3.12+ (backend) · JavaScript/JSX (frontend) |
-| **Backend** | FastAPI + uvicorn, `psycopg3` with plain SQL (no ORM) |
-| **Database** | PostgreSQL 16 + **pgvector** — Docker Compose locally, Neon in production |
-| **LLM** | **OpenRouter**, ordered free-model chain: `z-ai/glm-5.2:free` → `minimax/minimax-m3:free` → `nvidia/nemotron-3.5-lightning:free`, using OpenAI-standard `tools` / `tool_calls` |
-| **Agent** | Hand-rolled single tool-calling loop — 16 typed tools (10 read · 4 write · 2 propose/confirm), no agent framework |
-| **Search** | Hybrid in one SQL query: Postgres full-text (`tsvector` + GIN) **+** local embeddings (`fastembed`, `BAAI/bge-small-en-v1.5`, 384-dim) fused with Reciprocal Rank Fusion |
-| **Frontend** | React 18, Vite, Tailwind CSS 4 |
-| **Realtime** | Server-Sent Events — the dashboard refetches the instant any record changes |
-| **Auth** | Email/Student-ID sign-in, PBKDF2-SHA256 password hashing, HMAC-signed session tokens |
-| **Deploy** | Vercel (frontend) · Render (API) · Neon (Postgres) |
+| Layer        | Choice                                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Language** | Python 3.12+ (backend) · JavaScript/JSX (frontend)                                                                                                                             |
+| **Backend**  | FastAPI + uvicorn, `psycopg3` with plain SQL (no ORM)                                                                                                                          |
+| **Database** | PostgreSQL 16 + **pgvector** — Docker Compose locally, Neon in production                                                                                                      |
+| **LLM**      | **OpenRouter**, ordered free-model chain: `z-ai/glm-5.2:free` → `minimax/minimax-m3:free` → `nvidia/nemotron-3.5-lightning:free`, using OpenAI-standard `tools` / `tool_calls` |
+| **Agent**    | Hand-rolled single tool-calling loop — 16 typed tools (10 read · 4 write · 2 propose/confirm), no agent framework                                                              |
+| **Search**   | Hybrid in one SQL query: Postgres full-text (`tsvector` + GIN) **+** local embeddings (`fastembed`, `BAAI/bge-small-en-v1.5`, 384-dim) fused with Reciprocal Rank Fusion       |
+| **Frontend** | React 18, Vite, Tailwind CSS 4                                                                                                                                                 |
+| **Realtime** | Server-Sent Events — the dashboard refetches the instant any record changes                                                                                                    |
+| **Auth**     | Email/Student-ID sign-in, PBKDF2-SHA256 password hashing, HMAC-signed session tokens                                                                                           |
+| **Deploy**   | Vercel (frontend) · Render (API) · Neon (Postgres)                                                                                                                             |
 
 ---
 
@@ -77,7 +77,7 @@ docker compose up -d
 cp .env.example .env          # Windows: copy .env.example .env
 ```
 
-Open `.env` and set **`OPENROUTER_API_KEYS`** — grab a free key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys). Everything else already has a working default. *(The dashboard and all CRUD work without a key; only the chat agent needs one.)*
+Open `.env` and set **`OPENROUTER_API_KEYS`** — grab a free key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys). Everything else already has a working default. _(The dashboard and all CRUD work without a key; only the chat agent needs one.)_
 
 ### 3 · Start the backend
 
@@ -125,7 +125,7 @@ npm run dev
 
 Go to **[http://localhost:5173](http://localhost:5173)** — Vite proxies `/api` to the backend on port 8000.
 
-**Create an account with "Sign up"** (any email + a password of at least 6 characters). CampusOS requires sign-in so that every booking and registration has a real owner. To instead sign in as a student who *already* owns seed bookings, set `SEED_USER_PASSWORD` in `.env`, restart the backend, and use that password with `sakibul.hassan@aust.edu`.
+**Create an account with "Sign up"** (any email + a password of at least 6 characters). CampusOS requires sign-in so that every booking and registration has a real owner. To instead sign in as a student who _already_ owns seed bookings, set `SEED_USER_PASSWORD` in `.env`, restart the backend, and use that password with `sakibul.hassan@aust.edu`.
 
 <details>
 <summary><b>Alternative: one command for both servers</b></summary>
@@ -166,43 +166,44 @@ Copy [`.env.example`](.env.example) → `.env` in the repository root. **Never c
 
 ### Required
 
-| Key | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Postgres connection string. The default matches `docker-compose.yml` (port **5433**). The app refuses to start without it. |
+| Key                   | Purpose                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | Postgres connection string. The default matches `docker-compose.yml` (port **5433**). The app refuses to start without it.                                                                                           |
 | `OPENROUTER_API_KEYS` | Comma-separated OpenRouter key(s). The gateway cycles them, so the free-tier daily allowance multiplies by the number of keys. `OPENROUTER_API_KEY` (singular) is also accepted. **Needed for the chat agent only.** |
 
 ### Optional
 
-| Key | Default | Purpose |
-| --- | --- | --- |
-| `APP_ENV` | `development` | `production` makes `AUTH_SECRET` mandatory and stops trusting localhost origins |
-| `OPENROUTER_MODELS` | GLM 5.2 → MiniMax M3 → Nemotron Lightning | Ordered model chain; each model is tried on every healthy key before the next |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Provider endpoint — point it at any OpenAI-compatible gateway |
-| `OPENROUTER_RPD_PER_KEY` / `OPENROUTER_RPM_PER_KEY` | `50` / `20` | Advisory free-tier budget per key (a real `429` always wins) |
-| `AGENT_MAX_ITERATIONS` | `6` | Max tool-calling hops per turn |
-| `AGENT_TURN_BUDGET_S` | `45` | Wall-clock budget for one agent turn |
-| `AGENT_CALL_TIMEOUT_S` | `30` | Per-request timeout to the LLM provider |
-| `AGENT_MAX_CONCURRENT` | `8` | Concurrent agent turns served |
-| `AGENT_MAX_TOKENS` | `700` | Response cap — keeps answers tight and fast |
-| `AGENT_HISTORY_TURNS` | `12` | Conversation turns kept in context |
-| `AGENT_DAILY_CAP` | `800` | Deployment-wide daily turn cap; protects the free quota on a public URL |
-| `AGENT_DEGRADED_MODE` | `1` | `1` = when every provider fails, still answer read-only questions from live data and refuse to act |
-| `EMBEDDINGS_ENABLED` | `1` | `0` = keyword-only search; skips the model download and saves ~200 MB RAM |
-| `TZ_NAME` | `Asia/Dhaka` | Campus timezone used to resolve "today", "tomorrow", "this week" |
-| `DEPARTMENT` | `CSE` | Department recorded on new accounts |
-| `EMAIL_DOMAIN` | `aust.edu` | Domain used to build email addresses for accounts seeded from `data/*.json` |
-| `AUTH_SECRET` | random per process | Session-token signing key. Unset means a restart signs everyone out. **Mandatory when `APP_ENV=production`.** |
-| `AUTH_TOKEN_TTL_S` | `43200` | Session lifetime in seconds (12 h) |
-| `SEED_USER_PASSWORD` | *(unset)* | Shared password for the people named in `data/*.json`. Unset = those accounts cannot sign in, and you register your own instead |
-| `ALLOWED_ORIGINS` | *(none)* | Extra CORS origins for a separately hosted frontend, comma-separated |
-| `PORT` / `APP_URL` | `8000` / `http://localhost:8000` | Bind port and public URL |
+| Key                                                 | Default                                   | Purpose                                                                                                                         |
+| --------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`                                           | `development`                             | `production` makes `AUTH_SECRET` mandatory and stops trusting localhost origins                                                 |
+| `OPENROUTER_MODELS`                                 | GLM 5.2 → MiniMax M3 → Nemotron Lightning | Ordered model chain; each model is tried on every healthy key before the next                                                   |
+| `OPENROUTER_BASE_URL`                               | `https://openrouter.ai/api/v1`            | Provider endpoint — point it at any OpenAI-compatible gateway                                                                   |
+| `OPENROUTER_RPD_PER_KEY` / `OPENROUTER_RPM_PER_KEY` | `50` / `20`                               | Advisory free-tier budget per key (a real `429` always wins)                                                                    |
+| `AGENT_MAX_ITERATIONS`                              | `6`                                       | Max tool-calling hops per turn                                                                                                  |
+| `AGENT_TURN_BUDGET_S`                               | `45`                                      | Wall-clock budget for one agent turn                                                                                            |
+| `AGENT_CALL_TIMEOUT_S`                              | `30`                                      | Per-request timeout to the LLM provider                                                                                         |
+| `AGENT_MAX_CONCURRENT`                              | `8`                                       | Concurrent agent turns served                                                                                                   |
+| `AGENT_MAX_TOKENS`                                  | `700`                                     | Response cap — keeps answers tight and fast                                                                                     |
+| `AGENT_HISTORY_TURNS`                               | `12`                                      | Conversation turns kept in context                                                                                              |
+| `AGENT_DAILY_CAP`                                   | `800`                                     | Deployment-wide daily turn cap; protects the free quota on a public URL                                                         |
+| `RATE_LIMIT_PER_MINUTE` / `RATE_LIMIT_PER_DAY`      | `20` / `200`                              | Per-visitor ceiling on agent calls; raise it when many people share one campus IP                                               |
+| `AGENT_DEGRADED_MODE`                               | `1`                                       | `1` = when every provider fails, still answer read-only questions from live data and refuse to act                              |
+| `EMBEDDINGS_ENABLED`                                | `1`                                       | `0` = keyword-only search; skips the model download and saves ~200 MB RAM                                                       |
+| `TZ_NAME`                                           | `Asia/Dhaka`                              | Campus timezone used to resolve "today", "tomorrow", "this week"                                                                |
+| `DEPARTMENT`                                        | `CSE`                                     | Department recorded on new accounts                                                                                             |
+| `EMAIL_DOMAIN`                                      | `aust.edu`                                | Domain used to build email addresses for accounts seeded from `data/*.json`                                                     |
+| `AUTH_SECRET`                                       | random per process                        | Session-token signing key. Unset means a restart signs everyone out. **Mandatory when `APP_ENV=production`.**                   |
+| `AUTH_TOKEN_TTL_S`                                  | `43200`                                   | Session lifetime in seconds (12 h)                                                                                              |
+| `SEED_USER_PASSWORD`                                | _(unset)_                                 | Shared password for the people named in `data/*.json`. Unset = those accounts cannot sign in, and you register your own instead |
+| `ALLOWED_ORIGINS`                                   | _(none)_                                  | Extra CORS origins for a separately hosted frontend, comma-separated                                                            |
+| `PORT` / `APP_URL`                                  | `8000` / `http://localhost:8000`          | Bind port and public URL                                                                                                        |
 
 ### Frontend ([`client/.env.example`](client/.env.example))
 
-| Key | Purpose |
-| --- | --- |
-| `VITE_API_BASE` | Base URL of the hosted API. Leave unset locally — Vite proxies `/api` for you. **Deploy only.** |
-| `VITE_DEV_API_TARGET` | Override the dev proxy target if your backend isn't on `127.0.0.1:8000` |
+| Key                   | Purpose                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `VITE_API_BASE`       | Base URL of the hosted API. Leave unset locally — Vite proxies `/api` for you. **Deploy only.** |
+| `VITE_DEV_API_TARGET` | Override the dev proxy target if your backend isn't on `127.0.0.1:8000`                         |
 
 ---
 
@@ -238,16 +239,16 @@ Open the **Assistant** panel from the bottom-right of the dashboard. The agent r
 "Cancel my booking for tomorrow."
 ```
 
-Before any write, the agent **proposes the action and waits for you to confirm**. It checks a candidate slot against existing bookings, the class timetable, *and* scheduled events before booking.
+Before any write, the agent **proposes the action and waits for you to confirm**. It checks a candidate slot against existing bookings, the class timetable, _and_ scheduled events before booking.
 
-### 🛡️ What it will *not* do
+### 🛡️ What it will _not_ do
 
-| You say | It does |
-| --- | --- |
-| *"Just book me any room."* | **Asks which room, when, and how long** — vague requests never become guesses |
-| *"Register me for the Git workshop"* (it's 30/30 full) | **Refuses** — capacity is enforced in the database |
-| *"Cancel Tanvir's booking."* | **Refuses** — you may only cancel what you own |
-| *"Book 7A02 at 10 AM Sunday"* (a class is there) | **Refuses and offers free alternatives** |
+| You say                                                | It does                                                                       |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| _"Just book me any room."_                             | **Asks which room, when, and how long** — vague requests never become guesses |
+| _"Register me for the Git workshop"_ (it's 30/30 full) | **Refuses** — capacity is enforced in the database                            |
+| _"Cancel Tanvir's booking."_                           | **Refuses** — you may only cancel what you own                                |
+| _"Book 7A02 at 10 AM Sunday"_ (a class is there)       | **Refuses and offers free alternatives**                                      |
 
 > Authorization and validation live in the service layer and in database constraints — **not** in the prompt. No phrasing gets around them.
 
@@ -312,11 +313,11 @@ data/                 # seed JSON — read-only, loaded into Postgres on first b
 
 ## ☁️ Deployment
 
-| Target | Notes |
-| --- | --- |
-| **API — Render** | [`render.yaml`](render.yaml) blueprint. Root dir `backend`, health check `/api/meta`. Set `DATABASE_URL` (Neon), `OPENROUTER_API_KEYS`, `AUTH_SECRET`, `APP_ENV=production`, and `ALLOWED_ORIGINS` (your frontend URL). |
-| **Frontend — Vercel** | Root directory `client`, framework Vite. Set `VITE_API_BASE` to the Render URL — changing it requires a rebuild. |
-| **Database — Neon** | Free Postgres with `pgvector`. Paste the connection string into `DATABASE_URL`. |
+| Target                | Notes                                                                                                                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **API — Render**      | [`render.yaml`](render.yaml) blueprint. Root dir `backend`, health check `/api/meta`. Set `DATABASE_URL` (Neon), `OPENROUTER_API_KEYS`, `AUTH_SECRET`, `APP_ENV=production`, and `ALLOWED_ORIGINS` (your frontend URL). |
+| **Frontend — Vercel** | Root directory `client`, framework Vite. Set `VITE_API_BASE` to the Render URL — changing it requires a rebuild.                                                                                                        |
+| **Database — Neon**   | Free Postgres with `pgvector`. Paste the connection string into `DATABASE_URL`.                                                                                                                                         |
 
 In single-process mode the API also serves the built client: run `npm run build` in `client/`, and FastAPI mounts `client/dist` at `/`.
 

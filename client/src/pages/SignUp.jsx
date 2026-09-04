@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import { api, setAuth, toast } from "../api.js";
 import AuthLayout from "../components/AuthLayout.jsx";
-import { Button, Field, Select, TextInput } from "../components/ui.jsx";
+import { Button, Field, TextInput } from "../components/ui.jsx";
+import { CAMPUS_DOMAIN, CAMPUS_EMAIL_EXAMPLE, isCampusEmail, parseCampusEmail } from "../lib/aust.js";
 import { cx } from "../lib/format.js";
 
-const DEPARTMENTS = ["CSE", "EEE", "ME", "CE", "TE", "Architecture", "BBA"];
 const MIN_PASSWORD = 6;
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function strengthOf(password) {
   if (!password) return null;
@@ -26,8 +24,6 @@ export default function SignUp({ onNavigate, onSuccess }) {
   const [values, setValues] = useState({
     name: "",
     email: "",
-    studentId: "",
-    department: "CSE",
     password: "",
     confirmPassword: "",
   });
@@ -37,6 +33,7 @@ export default function SignUp({ onNavigate, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const strength = useMemo(() => strengthOf(values.password), [values.password]);
+  const identity = useMemo(() => parseCampusEmail(values.email), [values.email]);
 
   const set = (key) => (e) => {
     setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -46,8 +43,10 @@ export default function SignUp({ onNavigate, onSuccess }) {
   const validate = () => {
     const next = {};
     if (!values.name.trim()) next.name = "Enter your full name.";
-    if (!values.email.trim()) next.email = "Enter your email address.";
-    else if (!EMAIL_RE.test(values.email.trim())) next.email = "That doesn't look like a valid email address.";
+    if (!values.email.trim()) next.email = `Enter your AUST email address (@${CAMPUS_DOMAIN}).`;
+    else if (!isCampusEmail(values.email))
+      next.email = `CampusOS is for AUST students only — use your @${CAMPUS_DOMAIN} address.`;
+    else if (!identity) next.email = `Your AUST email should look like ${CAMPUS_EMAIL_EXAMPLE}.`;
     if (!values.password) next.password = "Choose a password.";
     else if (values.password.length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
     if (values.confirmPassword !== values.password) next.confirmPassword = "Passwords don't match.";
@@ -72,8 +71,6 @@ export default function SignUp({ onNavigate, onSuccess }) {
         name: values.name.trim(),
         email: values.email.trim().toLowerCase(),
         password: values.password,
-        student_id: values.studentId.trim() || undefined,
-        department: values.department,
       });
       setAuth(res.user, res.token);
       toast(`Account created — welcome, ${res.user.name}`, "success");
@@ -90,7 +87,7 @@ export default function SignUp({ onNavigate, onSuccess }) {
     <AuthLayout
       eyebrow="Get started"
       title="Create your student account"
-      subtitle="Takes a minute. You'll get your routine, room booking, event registration and the assistant."
+      subtitle={`For AUST students only. Sign up with your university email (${CAMPUS_EMAIL_EXAMPLE}) — your student ID and department are read from it.`}
       onHome={() => onNavigate?.("/")}
       footer={
         <>
@@ -129,14 +126,20 @@ export default function SignUp({ onNavigate, onSuccess }) {
           )}
         </Field>
 
-        <Field label="Email address" htmlFor="signup-email" required error={errors.email}>
+        <Field
+          label="AUST email address"
+          htmlFor="signup-email"
+          required
+          error={errors.email}
+          hint={`Format: ${CAMPUS_EMAIL_EXAMPLE}`}
+        >
           {({ describedBy }) => (
             <TextInput
               id="signup-email"
               type="email"
               value={values.email}
               onChange={set("email")}
-              placeholder="your university email"
+              placeholder={CAMPUS_EMAIL_EXAMPLE}
               autoComplete="email"
               invalid={Boolean(errors.email)}
               aria-describedby={describedBy}
@@ -144,28 +147,24 @@ export default function SignUp({ onNavigate, onSuccess }) {
           )}
         </Field>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Student ID" htmlFor="signup-studentId" hint="We'll assign one if you skip this.">
-            {({ describedBy }) => (
-              <TextInput
-                id="signup-studentId"
-                value={values.studentId}
-                onChange={set("studentId")}
-                placeholder="e.g. 00-00000"
-                aria-describedby={describedBy}
-              />
-            )}
-          </Field>
-
-          <Field label="Department" htmlFor="signup-department" required>
-            <Select id="signup-department" value={values.department} onChange={set("department")}>
-              {DEPARTMENTS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        <div
+          aria-live="polite"
+          className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-[13px] text-ink-2"
+        >
+          {identity ? (
+            <dl className="grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Student ID</dt>
+                <dd className="mt-0.5 font-medium text-ink tabular">{identity.studentId}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Department</dt>
+                <dd className="mt-0.5 font-medium text-ink">{identity.department}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p>Your student ID and department appear here as soon as your AUST email is recognised.</p>
+          )}
         </div>
 
         <Field

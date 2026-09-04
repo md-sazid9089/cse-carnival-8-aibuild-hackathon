@@ -24,8 +24,8 @@ const SIDEBAR = [
 
 function Panel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-xl border border-cream-200 bg-white p-3.5", className)}>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">{title}</p>
+    <div className={cn("rounded-xl border border-line bg-surface p-3.5", className)}>
+      <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] uppercase text-ink-3">{title}</p>
       {children}
     </div>
   );
@@ -55,27 +55,27 @@ export function ProductMockup() {
       {/* floating accents */}
       <motion.div
         aria-hidden
-        className="absolute -left-4 top-16 hidden rounded-2xl border border-cream-200 bg-white px-3.5 py-2.5 shadow-lift lg:block"
+        className="absolute top-16 -left-4 hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-lg lg:block"
         initial={{ opacity: 0, x: -12 }}
         animate={inView ? { opacity: 1, x: 0 } : undefined}
         transition={{ delay: 0.9, duration: 0.5 }}
       >
         <div className="animate-float">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-terracotta">Announcement edited</p>
-          <p className="mt-0.5 text-xs font-semibold text-forest-deep">CSE321 → Room 304, 2:00 PM</p>
+          <p className="text-[10px] font-semibold tracking-wider uppercase text-accent">Announcement edited</p>
+          <p className="mt-0.5 text-xs font-semibold text-ink">CSE321 → Room 304, 2:00 PM</p>
         </div>
       </motion.div>
 
       <motion.div
         aria-hidden
-        className="absolute -right-3 bottom-20 hidden rounded-2xl border border-cream-200 bg-white px-3.5 py-2.5 shadow-lift lg:block"
+        className="absolute -right-3 bottom-20 hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-lg lg:block"
         initial={{ opacity: 0, x: 12 }}
         animate={inView && phase >= 4 ? { opacity: 1, x: 0 } : undefined}
         transition={{ duration: 0.5 }}
       >
         <div className="animate-float [animation-delay:1.2s]">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-moss">Tool call</p>
-          <p className="mt-0.5 font-mono text-xs text-forest-deep">list_announcements() ✓</p>
+          <p className="text-[10px] font-semibold tracking-wider uppercase text-ink-3">Tool call</p>
+          <p className="mt-0.5 font-mono text-xs text-ink">list_announcements() ✓</p>
         </div>
       </motion.div>
 
@@ -84,7 +84,7 @@ export function ProductMockup() {
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
         animate={inView ? { opacity: 1, y: 0, scale: 1 } : undefined}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="overflow-hidden rounded-3xl border border-cream-200 bg-cream-50 shadow-lift"
+        className="overflow-hidden rounded-2xl border border-line bg-canvas shadow-lg"
       >
         <div className="flex items-center gap-1.5 border-b border-cream-200 bg-white/70 px-4 py-2.5">
           <span className="size-2.5 rounded-full bg-cream-200" />
@@ -96,13 +96,13 @@ export function ProductMockup() {
         </div>
 
         <div className="grid grid-cols-[auto_1fr] lg:grid-cols-[150px_1fr_260px]">
-          <aside className="hidden flex-col gap-0.5 border-r border-cream-200 bg-white/60 p-3 sm:flex">
+          <aside className="hidden flex-col gap-0.5 border-r border-line bg-surface/60 p-3 sm:flex">
             {SIDEBAR.map((s) => (
               <div
                 key={s.label}
                 className={cn(
                   "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs",
-                  s.active ? "bg-forest-deep font-semibold text-cream-50" : "text-forest",
+                  s.active ? "bg-ink font-semibold text-ink-invert" : "text-ink-2",
                 )}
               >
                 <s.icon className="size-3.5" aria-hidden />
@@ -120,15 +120,15 @@ export function ProductMockup() {
                     key={phase >= 1 ? "moved" : "orig"}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-ink-muted"
+                    className="text-xs text-ink-3"
                   >
                     {phase >= 1 ? "Today · 2:00 PM · Room 304" : "Today · 11:00 AM · Room 201"}
                   </motion.p>
                 </div>
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                    phase >= 1 ? "bg-peach/60 text-terracotta-deep" : "bg-sage/30 text-forest",
+                    "rounded-md px-2 py-0.5 text-[10px] font-medium",
+                    phase >= 1 ? "bg-accent-soft text-accent-ink" : "bg-surface-3 text-ink-2",
                   )}
                 >
                   {phase >= 1 ? "Rescheduled" : "On time"}
@@ -137,22 +137,22 @@ export function ProductMockup() {
             </Panel>
             <Panel title="Upcoming assignments">
               <ul className="space-y-1.5 text-xs">
-                <li className="flex justify-between"><span>Compiler lab report</span><span className="text-terracotta">Thu</span></li>
-                <li className="flex justify-between"><span>ML assignment 2</span><span className="text-ink-muted">Sun</span></li>
+                <li className="flex justify-between"><span>Compiler lab report</span><span className="text-accent">Thu</span></li>
+                <li className="flex justify-between"><span>ML assignment 2</span><span className="text-ink-3">Sun</span></li>
               </ul>
             </Panel>
             <Panel title="Today’s events">
               <p className="text-xs font-semibold">Deep Learning guest lecture</p>
-              <p className="text-xs text-ink-muted">12:30 · 7C02 · 18 seats left</p>
+              <p className="text-xs text-ink-3">12:30 · 7C02 · 18 seats left</p>
             </Panel>
             <Panel title="Important announcement">
               <p className="text-xs font-semibold">CSE321 moved to Room 304</p>
-              <p className="text-xs text-ink-muted">Posted 2 min ago · High</p>
+              <p className="text-xs text-ink-3">Posted 2 min ago · High</p>
             </Panel>
             <Panel title="Available rooms">
               <div className="flex flex-wrap gap-1">
                 {["7A02", "7A05", "7B03", "7C01"].map((r) => (
-                  <span key={r} className="rounded-md bg-sage/25 px-1.5 py-0.5 font-mono text-[10px] text-forest">{r}</span>
+                  <span key={r} className="rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-ink-2">{r}</span>
                 ))}
               </div>
             </Panel>
@@ -160,15 +160,15 @@ export function ProductMockup() {
 
           <section
             aria-label="AI assistant"
-            className="col-span-2 flex min-h-[220px] flex-col border-t border-cream-200 bg-white/70 p-4 lg:col-span-1 lg:border-l lg:border-t-0"
+            className="col-span-2 flex min-h-[220px] flex-col border-t border-line bg-surface/70 p-4 lg:col-span-1 lg:border-t-0 lg:border-l"
           >
             <div className="mb-3 flex items-center gap-2">
-              <span className="grid size-6 place-items-center rounded-full bg-forest text-cream-50">
+              <span className="grid size-6 place-items-center rounded-md bg-ink text-ink-invert">
                 <Sparkles className="size-3" aria-hidden />
               </span>
               <p className="text-xs font-semibold">AI Assistant</p>
-              <span className="ml-auto flex items-center gap-1 text-[10px] text-moss">
-                <span className="size-1.5 rounded-full bg-moss" /> live
+              <span className="ml-auto flex items-center gap-1 text-[10px] text-ink-3">
+                <span className="size-1.5 rounded-full bg-positive" /> live
               </span>
             </div>
             <div className="flex flex-1 flex-col justify-end gap-3">

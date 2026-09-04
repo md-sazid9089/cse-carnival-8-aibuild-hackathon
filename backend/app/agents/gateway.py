@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -20,6 +21,14 @@ from ..db import execute, q
 log = logging.getLogger("campusos.gateway")
 
 RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
+# Free models go busy for a few seconds. Wait that out rather than declaring the assistant offline.
+MAX_THROTTLE_ROUNDS = 2
+MAX_THROTTLE_WAIT_S = 8.0
+# A 429 means one of three different things; only an account-level cap should cost a key for the day.
+KEY_DAILY_RE = re.compile(r"per[\s-]?day|daily limit|free-models-per-day|add (more )?credits|"
+                          r"insufficient credits|quota exceeded", re.I)
+KEY_MINUTE_RE = re.compile(r"per[\s-]?(minute|second|hour)|requests? per\b", re.I)
+UPSTREAM_RE = re.compile(r"upstream|provider returned error|temporarily rate.?limited", re.I)
 
 
 class LLMError(Exception):
@@ -47,6 +56,9 @@ class KeyState:
     used_minute: int = 0
     blocked_until: float = 0.0  # monotonic; set by 429 Retry-After
     exhausted_day: date | None = None
+    # OpenRouter calls the free cap "account-level", but other free models keep answering on the
+    # same key, so it is tracked per model instead of writing the whole key off for the day.
+    exhausted_models: dict[str, date] = field(default_factory=dict)
 
     def _roll(self) -> None:
         today = datetime.now(timezone.utc).date()
@@ -54,6 +66,7 @@ class KeyState:
             self.day, self.used_today = today, 0
             if self.exhausted_day and self.exhausted_day != today:
                 self.exhausted_day = None
+            self.exhausted_models = {m: d for m, d in self.exhausted_models.items() if d == today}
         now = time.monotonic()
         if now - self.minute_start >= 60:
             self.minute_start, self.used_minute = now, 0
@@ -64,21 +77,27 @@ class KeyState:
             return False
         if time.monotonic() < self.blocked_until:
             return False
-        if self.used_today >= config.OPENROUTER_RPD_PER_KEY:
-            return False
+        # the daily budget is an estimate of someone else's limit, so it only reorders keys
         return self.used_minute < config.OPENROUTER_RPM_PER_KEY
+
+    def available_for(self, model: str) -> bool:
+        return self.available() and self.exhausted_models.get(model) != self.day
 
     def note_request(self) -> None:
         self._roll()
         self.used_today += 1
         self.used_minute += 1
 
-    def note_429(self, retry_after: float | None) -> None:
+    def note_429(self, retry_after: float | None, daily: bool = False, model: str | None = None) -> None:
+        """A daily cap costs the key that model for the rest of the day; anything else is a cooldown."""
         self._roll()
-        if retry_after and retry_after < 300:
-            self.blocked_until = time.monotonic() + retry_after
-        else:  # free-tier daily cap: park this key until tomorrow
-            self.exhausted_day = self.day
+        if daily:
+            if model:
+                self.exhausted_models[model] = self.day
+            else:
+                self.exhausted_day = self.day
+            return
+        self.blocked_until = time.monotonic() + min(max(retry_after or 60.0, 5.0), 300.0)
 
     def limit_status(self) -> str:
         self._roll()
@@ -203,16 +222,22 @@ class Gateway:
 
     # ---- attempt planning ----
     def _note_429(self, model: str, ks: KeyState, res: httpx.Response) -> None:
-        """Split the two very different things a 429 can mean.
+        """Split the three very different things a 429 can mean.
 
         A free model that is busy upstream answers with a short Retry-After and names the
         provider; that throttles the *model* for everyone, so parking the key would burn the
-        whole pool on a five-second hiccup. Only an account-level cap parks the key.
+        whole pool on a five-second hiccup. A per-minute limit is the key's, but only for a
+        minute. A daily cap costs this key that one model for the rest of the day.
         """
         retry_after = _retry_after(res)
-        detail = _error_detail(res).lower()
-        upstream = "upstream" in detail or "provider returned error" in detail
-        if upstream or (retry_after is not None and retry_after <= 60):
+        detail = _error_detail(res)
+        if KEY_DAILY_RE.search(detail):
+            ks.note_429(retry_after, daily=True, model=model)
+            return
+        if KEY_MINUTE_RE.search(detail):
+            ks.note_429(retry_after)
+            return
+        if UPSTREAM_RE.search(detail) or (retry_after is not None and retry_after <= 60):
             self.breakers.setdefault(model, Breaker()).park(min(max(retry_after or 5.0, 2.0), 60.0))
             return
         ks.note_429(retry_after)
@@ -240,9 +265,9 @@ class Gateway:
         for model in (models or self.models):
             if not self.breakers.setdefault(model, Breaker()).closed():
                 continue
-            for offset in range(len(self.keys)):
-                ks = self.keys[(start + offset) % len(self.keys)]
-                if ks.available():
+            rotation = [self.keys[(start + offset) % len(self.keys)] for offset in range(len(self.keys))]
+            for ks in sorted(rotation, key=lambda k: k.used_today >= config.OPENROUTER_RPD_PER_KEY):
+                if ks.available_for(model):
                     plan.append((model, ks))
         return plan
 
@@ -320,7 +345,8 @@ class Gateway:
         raise LLMError(f"All providers failed ({last}).", "LLM_UNAVAILABLE")
 
     async def stream(self, messages: list[dict], tools: list[dict] | None = None,
-                     tool_choice: str | None = None, models: list[str] | None = None):
+                     tool_choice: str | None = None, models: list[str] | None = None,
+                     _round: int = 0):
         """Yield ('token', str) / ('done', payload). Tool-call deltas are aggregated internally and
         only surfaced on 'done' with finish_reason='tool_calls' — a stream cut before finish_reason
         discards everything, so nothing is ever dispatched from a partial response."""
@@ -328,6 +354,12 @@ class Gateway:
             raise LLMError("No OpenRouter API keys configured.", "NOT_CONFIGURED", retryable=False)
         attempts = self._attempts(models)
         if not attempts:
+            wait = self._park_wait_s(models)
+            if wait is not None and wait <= MAX_THROTTLE_WAIT_S and _round + 1 < MAX_THROTTLE_ROUNDS:
+                await asyncio.sleep(wait + 0.2)
+                async for item in self.stream(messages, tools, tool_choice, models, _round + 1):
+                    yield item
+                return
             raise LLMError("All API keys are rate-limited right now.", "RATE_LIMITED")
         last = "unknown error"
         client = await self.client()
@@ -413,15 +445,29 @@ class Gateway:
                                     "finish_reason": "error", "model": model, "key_index": ks.index})
                     return
                 continue
+        wait = self._park_wait_s(models)
+        if wait is not None and wait <= MAX_THROTTLE_WAIT_S and _round + 1 < MAX_THROTTLE_ROUNDS:
+            await asyncio.sleep(wait + 0.2)
+            async for item in self.stream(messages, tools, tool_choice, models, _round + 1):
+                yield item
+            return
         raise LLMError(f"All providers failed ({last}).", "LLM_UNAVAILABLE")
 
 
 def _retry_after(res: httpx.Response) -> float | None:
+    """Seconds to wait. `x-ratelimit-reset` is an absolute epoch (OpenRouter sends ms), not a delta."""
     raw = res.headers.get("retry-after") or res.headers.get("x-ratelimit-reset")
     try:
-        return float(raw) if raw else None
+        value = float(raw) if raw else None
     except (TypeError, ValueError):
         return None
+    if value is None:
+        return None
+    if value > 1e11:
+        value = value / 1000 - time.time()
+    elif value > 1e9:
+        value -= time.time()
+    return max(value, 0.0)
 
 
 def _error_detail(res: httpx.Response) -> str:

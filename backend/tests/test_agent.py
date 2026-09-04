@@ -20,7 +20,7 @@ from app import config  # noqa: E402
 from app.agents import degraded, store, tools  # noqa: E402
 from app.agents.agent import run_turn  # noqa: E402
 from app.agents.gateway import Gateway, LLMError  # noqa: E402
-from app.db import execute, migrate, q1  # noqa: E402
+from app.db import execute, migrate, q, q1  # noqa: E402
 from app.services import events, rooms  # noqa: E402
 from app.services.common import DomainError, parse_time  # noqa: E402
 
@@ -152,13 +152,27 @@ check("gateway: pool recovers on the next turn after an upstream throttle",
       out["message"]["content"] == "fallback answer" and fake.calls[-1][1] == "model-a",
       fake.calls)
 
-# An account-level cap has no short Retry-After: that one really does park the key.
+# An account-level cap is really per model: the key keeps working on the rest of the chain.
 gw, fake = make_gateway([(429, {"error": {"message": "Rate limit exceeded: free-models-per-day"}}),
                          (200, _msg("other key"))])
 out = run(gw.complete([{"role": "user", "content": "x"}]))
-check("gateway: daily cap 429 parks the key and cycles",
-      out["message"]["content"] == "other key" and not gw.keys[0].available(),
+check("gateway: daily cap 429 costs the key that model only, and cycles",
+      out["message"]["content"] == "other key"
+      and not gw.keys[0].available_for("model-a") and gw.keys[0].available(),
       [k.limit_status() for k in gw.keys])
+
+# OpenRouter sends x-ratelimit-reset as an absolute epoch in MILLISECONDS. Read as a delta it looked
+# like "retry in 57 years", which parked a healthy key for the rest of the day on a one-minute limit.
+gw, fake = make_gateway([(429, {"error": {"message": "Rate limit exceeded: 20 requests per minute"}},
+                          {"x-ratelimit-reset": str(int((time.time() + 30) * 1000))}),
+                         (200, _msg("other key"))])
+out = run(gw.complete([{"role": "user", "content": "x"}]))
+cooldown = gw.keys[0].blocked_until - time.monotonic()
+check("gateway: per-minute 429 is a short key cooldown, never a day-long park",
+      out["message"]["content"] == "other key" and gw.keys[0].exhausted_day is None and cooldown < 120,
+      (cooldown, [k.limit_status() for k in gw.keys]))
+check("gateway: a per-minute 429 does not park the model for other keys",
+      gw.breakers["model-a"].closed() and fake.calls[1][1] == "model-a", fake.calls)
 
 gw, fake = make_gateway([(401, {"error": {"message": "bad key"}}), (200, _msg("ok"))])
 out = run(gw.complete([{"role": "user", "content": "x"}]))
@@ -187,7 +201,12 @@ gw, _ = make_gateway([(200, _msg("x"))])
 ks = gw.keys[0]
 for _ in range(config.OPENROUTER_RPD_PER_KEY):
     ks.note_request()
-check("gateway: daily bucket blocks a spent key", not ks.available(), ks.used_today)
+ks.minute_start = time.monotonic() - 61  # isolate the assertion to the daily budget
+check("gateway: the advisory daily budget warns instead of taking a key offline",
+      ks.available() and ks.limit_status() == "warning", (ks.used_today, ks.limit_status()))
+plan = gw._attempts()
+check("gateway: an over-budget key is tried last, not first",
+      plan and plan[0][1] is not ks, [k.index for _, k in plan])
 check("gateway: health masks counts",
       set(gw.health()["providers"][0]) == {"name", "keys", "status", "limit_status"}, gw.health())
 check("gateway: health has no key material",
@@ -352,6 +371,31 @@ for text, needle in [("when is my next class?", "CSE"), ("what's due this week?"
     check(f"degraded answers read intent: {text!r}", out is not None and out["reply"], out)
 check("degraded ignores unrelated chatter", degraded.answer("hello there", PROFILE) is None)
 
+# Degraded answers must honour what was actually asked, not just today's date / every priority.
+out = degraded.answer("What classes do I have on Wednesday?", PROFILE)
+check("degraded uses the weekday in the question, not today",
+      out is not None and "weekend" not in out["reply"], out)
+out = degraded.answer("Show me all high priority announcements.", PROFILE)
+check("degraded filters announcements by the requested priority",
+      out is not None and "[medium]" not in out["reply"] and "[low]" not in out["reply"], out)
+
+# Judges edit a record mid-evaluation and ask about it, so the edited FIELD has to be in the answer:
+# a template that prints titles or room numbers only hides the change it is supposed to prove.
+bodies = [" ".join(str(r["body"]).split())[:30] for r in q("SELECT body FROM announcements")]
+out = degraded.answer("what are the latest announcements?", PROFILE)
+check("degraded shows announcement bodies, not just titles",
+      out is not None and any(b and b in out["reply"] for b in bodies), out)
+out = degraded.answer("which labs have computers?", PROFILE)
+check("degraded room answers carry capacity and equipment",
+      out is not None and "seats" in out["reply"] and "computers" in out["reply"], out)
+out = degraded.answer("which rooms fit at least 45 people?", PROFILE)
+check("degraded honours a capacity asked for in the question",
+      out is not None and "seats 30" not in out["reply"] and "seats 4" in out["reply"], out)
+out = degraded.answer("I'm free until 2 PM - is there anything on campus?", PROFILE)
+check("degraded answers a free-time question from events", out is not None and "\u2022" in out["reply"], out)
+check("degraded answers say they are templated, not the model's own words",
+      out is not None and out["reply"].startswith("**"), out)
+
 # ---------------------------------------------------------------- agent loop
 import app.agents.agent as agent_mod  # noqa: E402
 
@@ -397,6 +441,42 @@ execute("DELETE FROM bookings WHERE date='2026-09-21'")
 res, fake = turn("Tell me a joke", [httpx.ReadTimeout("x")] * 8)
 check("agent: total provider outage -> degraded or offline message, never a crash",
       res["agent"] in ("degraded", "assistant") and bool(res["reply"]), res)
+
+# Some free models ignore tool_choice='required' and answer a data question from memory. That is a
+# wrong answer dressed as a right one, so the loop must try another model instead of relaying it.
+res, fake = turn("What assignments do I have due this week?",
+                 [(200, _msg("You have nothing due, relax.")),
+                  (200, _msg(None, _call("list_assignments", {"due_within_days": 7}))),
+                  (200, _msg("Two assignments are due this week."))])
+check("agent: a model that ignores tool_choice=required is retried on another model",
+      res["tool_calls"] and res["tool_calls"][0]["tool"] == "list_assignments", res)
+check("agent: the from-memory answer is never relayed",
+      "relax" not in res["reply"], res["reply"])
+check("agent: the retry actually switched model",
+      fake.calls[0][1] != fake.calls[1][1], fake.calls)
+
+# If no model will call a tool, answer from live data rather than the model's recollection.
+res, fake = turn("What assignments do I have due this week?",
+                 [(200, _msg("Nothing due, trust me.")), (200, _msg("Still nothing due.")),
+                  (200, _msg("Really nothing."))])
+check("agent: no model calls a tool -> grounded fallback, not the hallucination",
+      res["agent"] == "degraded" and "trust me" not in res["reply"], res)
+
+# A weak model can loop on the same tool forever; that wastes the free quota and never answers.
+same = _call("list_announcements", {})
+res, fake = turn("What classes do I have on Wednesday?",
+                 [(200, _msg(None, same)), (200, _msg(None, same)), (200, _msg(None, same)),
+                  (200, _msg(None, same)), (200, _msg(None, same)), (200, _msg(None, same))])
+check("agent: a repeated identical tool call stops the loop",
+      len(res["tool_calls"]) == 1 and bool(res["reply"]), res)
+check("agent: loop stop still answers from what was fetched",
+      "couldn't" not in res["reply"].lower(), res["reply"])
+
+# Weak models sometimes emit a bare '[' instead of prose. Never show that to a student.
+res, fake = turn("What classes do I have on Wednesday?",
+                 [(200, _msg(None, _call("list_schedules", {"day": "Wednesday"}))), (200, _msg("["))])
+check("agent: a degenerate '[' reply is replaced with real content",
+      res["reply"].strip() != "[" and len(res["reply"]) > 12, res["reply"])
 
 res, fake = turn("When is my next class?", [httpx.ReadTimeout("x")] * 8)
 check("agent: outage on a read question falls back to live data",
@@ -505,7 +585,8 @@ agent_mod.gateway = original
 check("agent: stream cut after a complete-looking answer keeps the text",
       "CSE 4129" in res["reply"], res)
 
-from app.ratelimit import PER_MINUTE, _hits, check as rl_check  # noqa: E402
+from app.config import RATE_LIMIT_PER_MINUTE as PER_MINUTE  # noqa: E402
+from app.ratelimit import _hits, check as rl_check  # noqa: E402
 
 
 class _Req:

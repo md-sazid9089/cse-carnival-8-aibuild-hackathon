@@ -38,7 +38,7 @@ function Brand() {
       </span>
       <span className="min-w-0">
         <span className="block text-sm leading-tight font-semibold text-ink">CampusOS</span>
-        <span className="block text-[11px] leading-tight text-ink-3">AUST · live campus data</span>
+        <span className="block text-[11px] leading-tight text-ink-3">AUST students only · live data</span>
       </span>
     </div>
   );
