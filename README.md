@@ -63,6 +63,7 @@ Copy [.env.example](.env.example) to `.env` (repo root). Never commit `.env`.
 | `AGENT_DEGRADED_MODE` | no | `1` = answer read-only questions from live data when every provider fails |
 | `EMBEDDINGS_ENABLED` | no | `0` = keyword-only search (saves ~200 MB RAM) |
 | `ALLOWED_ORIGINS` | no | Extra CORS origins for a separately hosted frontend (comma-separated) |
+| `AUTH_SECRET` | no | Signing key for sign-in session tokens (unset = random per process, so restarts end sessions) |
 | `TZ_NAME` | no | Timezone for "today/tomorrow" resolution (default `Asia/Dhaka`) |
 | `VITE_API_BASE` | deploy only | (Frontend, [client/.env.example](client/.env.example)) base URL of the hosted API |
 

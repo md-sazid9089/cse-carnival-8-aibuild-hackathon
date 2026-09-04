@@ -17,6 +17,8 @@ services:
         value: z-ai/glm-5.2:free,minimax/minimax-m3:free,nvidia/nemotron-3.5-lightning:free
       - key: ALLOWED_ORIGINS
         sync: false # your Vercel URL, e.g. https://campusos.vercel.app
+      - key: AUTH_SECRET
+        generateValue: true # signs sign-in session tokens
       - key: EMBEDDINGS_ENABLED
         value: "1" # set to "0" if the instance runs out of memory
       - key: TZ_NAME

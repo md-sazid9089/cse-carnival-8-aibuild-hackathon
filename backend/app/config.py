@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -44,6 +45,11 @@ AGENT_DEGRADED_MODE = os.getenv("AGENT_DEGRADED_MODE", "1") == "1"
 
 EMBEDDINGS_ENABLED = os.getenv("EMBEDDINGS_ENABLED", "1") == "1"
 TZ_NAME = os.getenv("TZ_NAME", "Asia/Dhaka")
+
+# Session-token signing key. Unset = a fresh random key per process, so tokens simply
+# stop working after a restart — never a guessable constant in a public repo.
+AUTH_SECRET = (os.getenv("AUTH_SECRET") or secrets.token_hex(32)).encode("utf-8")
+AUTH_TOKEN_TTL_S = _int("AUTH_TOKEN_TTL_S", 12 * 3600)
 # Local dev origins plus any extra origin for a separately hosted frontend.
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"] + _csv("ALLOWED_ORIGINS")
 APP_URL = os.getenv("APP_URL", "http://localhost:8000")

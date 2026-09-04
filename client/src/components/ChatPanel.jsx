@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { API_BASE } from "../api.js";
+import { API_BASE, authHeaders } from "../api.js";
 import { useMediaQuery } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { cx } from "../lib/format.js";
@@ -257,8 +257,7 @@ export default function ChatPanel({ open, onClose }) {
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          "X-Student-Id": profile.student_id,
-          "X-Student-Name": profile.name,
+          ...authHeaders(),
         },
         body: JSON.stringify({ message: content, conversation_id: conversationRef.current }),
       });

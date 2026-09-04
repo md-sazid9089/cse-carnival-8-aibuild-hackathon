@@ -1,0 +1,188 @@
+"""Authentication service: password hashing (PBKDF2-HMAC-SHA256), sign up, and sign in."""
+import base64
+import hashlib
+import hmac
+import json
+import secrets
+import time
+
+from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S
+from ..db import execute, next_id, q, q1
+from .common import DomainError
+
+ITERATIONS = 100_000
+
+
+def hash_password(password: str) -> str:
+    """Hash password using PBKDF2-HMAC-SHA256 with a cryptographically secure random salt."""
+    salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), ITERATIONS)
+    return f"pbkdf2:sha256:{ITERATIONS}${salt}${key.hex()}"
+
+
+def verify_password(password: str, stored_hash: str | None) -> bool:
+    """Verify password against stored hash in constant time."""
+    if not stored_hash or not stored_hash.startswith("pbkdf2:sha256:"):
+        return False
+    try:
+        parts = stored_hash.split("$")
+        iterations = int(parts[0].split(":")[2])
+        salt = parts[1]
+        expected_key = parts[2]
+        key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+        return secrets.compare_digest(key.hex(), expected_key)
+    except Exception:
+        return False
+
+
+def _sign(raw: bytes) -> str:
+    return hmac.new(AUTH_SECRET, raw, hashlib.sha256).hexdigest()
+
+
+def create_token(user: dict) -> str:
+    """Generate a signed, expiring bearer session token."""
+    now = int(time.time())
+    payload = {
+        "uid": user["id"],
+        "email": user["email"],
+        "role": user["role_id"],
+        "name": user["name"],
+        "student_id": user.get("student_id"),
+        "ts": now,
+        "exp": now + AUTH_TOKEN_TTL_S,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return f"{base64.urlsafe_b64encode(raw).decode('utf-8')}.{_sign(raw)}"
+
+
+def parse_token(token: str) -> dict | None:
+    """Verify and parse a bearer session token. Returns None for forged or expired tokens."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 2:
+            return None
+        raw = base64.urlsafe_b64decode(parts[0].encode("utf-8"))
+        if not hmac.compare_digest(parts[1], _sign(raw)):
+            return None
+        claims = json.loads(raw.decode("utf-8"))
+        if int(claims.get("exp", 0)) < int(time.time()):
+            return None
+        return claims
+    except Exception:
+        return None
+
+
+def get_user_permissions(role_id: str) -> list[str]:
+    rows = q("SELECT permission_id FROM role_permissions WHERE role_id = %s", [role_id])
+    return [r["permission_id"] for r in rows]
+
+
+def sign_up(name: str, email: str, password: str, student_id: str | None = None, department: str = "CSE") -> dict:
+    """Register a new user. Every registered user is initially given the 'student' role."""
+    name = (name or "").strip()
+    email = (email or "").strip().lower()
+    student_id = (student_id or "").strip() or None
+
+    if not name:
+        raise DomainError("MISSING_NAME", "Full name is required")
+    if not email or "@" not in email:
+        raise DomainError("INVALID_EMAIL", "A valid email address is required")
+    if not password or len(password) < 6:
+        raise DomainError("WEAK_PASSWORD", "Password must be at least 6 characters")
+
+    # Check for existing email
+    existing_email = q1("SELECT id FROM users WHERE LOWER(email) = %s", [email])
+    if existing_email:
+        raise DomainError("EMAIL_EXISTS", "An account with this email already exists", 409)
+
+    # Auto-generate student ID if not supplied for new student
+    if not student_id:
+        count_row = q1("SELECT COUNT(*) AS n FROM users WHERE student_id LIKE %s", ["26-%"])
+        n = count_row["n"] if count_row else 0
+        student_id = f"26-{n + 10001:05d}"
+    else:
+        existing_sid = q1("SELECT id FROM users WHERE student_id = %s", [student_id])
+        if existing_sid:
+            raise DomainError("STUDENT_ID_EXISTS", "An account with this student ID already exists", 409)
+
+    user_id = next_id("users", "usr")
+    hashed = hash_password(password)
+
+    # New users are always initialized with the 'student' role
+    initial_role = "student"
+
+    execute(
+        """INSERT INTO users (id, role_id, student_id, name, email, department, status, password_hash)
+           VALUES (%s, %s, %s, %s, %s, %s, 'active', %s)""",
+        [user_id, initial_role, student_id, name, email, department, hashed],
+    )
+
+    user = q1(
+        "SELECT id, role_id, student_id, employee_id, name, email, department, status, created_at FROM users WHERE id = %s",
+        [user_id],
+    )
+    user["permissions"] = get_user_permissions(initial_role)
+    token = create_token(user)
+
+    return {"token": token, "user": user}
+
+
+def sign_in(email_or_id: str, password: str) -> dict:
+    """Sign in using email or student_id and password."""
+    ident = (email_or_id or "").strip()
+    if not ident or not password:
+        raise DomainError("MISSING_CREDENTIALS", "Email/Student ID and password are required")
+
+    # Look up user by email or student ID
+    user = q1(
+        """SELECT id, role_id, student_id, employee_id, name, email, department, status, password_hash
+           FROM users
+           WHERE LOWER(email) = %s OR student_id = %s OR employee_id = %s OR id = %s""",
+        [ident.lower(), ident, ident, ident],
+    )
+
+    if not user:
+        raise DomainError("INVALID_CREDENTIALS", "Invalid credentials. Please check your email and password.", 401)
+
+    if not verify_password(password, user.get("password_hash")):
+        raise DomainError("INVALID_CREDENTIALS", "Invalid credentials. Please check your email and password.", 401)
+
+    if user.get("status") != "active":
+        raise DomainError("ACCOUNT_INACTIVE", "This account has been deactivated or suspended.", 403)
+
+    user_data = {
+        "id": user["id"],
+        "role_id": user["role_id"],
+        "student_id": user["student_id"],
+        "employee_id": user["employee_id"],
+        "name": user["name"],
+        "email": user["email"],
+        "department": user["department"],
+        "status": user["status"],
+        "permissions": get_user_permissions(user["role_id"]),
+    }
+    token = create_token(user_data)
+    return {"token": token, "user": user_data}
+
+
+def get_me(user_id: str) -> dict:
+    user = q1(
+        """SELECT id, role_id, student_id, employee_id, name, email, department, status
+           FROM users WHERE id = %s""",
+        [user_id],
+    )
+    if not user:
+        raise DomainError("NOT_FOUND", "User not found", 404)
+    user["permissions"] = get_user_permissions(user["role_id"])
+    return user
+
+
+def list_users() -> list[dict]:
+    rows = q(
+        """SELECT id, role_id, student_id, employee_id, name, email, department, status, created_at
+           FROM users ORDER BY role_id, name"""
+    )
+    for r in rows:
+        r["permissions"] = get_user_permissions(r["role_id"])
+    return rows
+

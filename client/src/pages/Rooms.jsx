@@ -1,19 +1,45 @@
-import { useMemo, useState } from "react";
-import { api } from "../api.js";
+import { useEffect, useMemo, useState } from "react";
+import { api, toast } from "../api.js";
+import { confirmAction } from "../components/ConfirmDialog.jsx";
 import DataTable from "../components/DataTable.jsx";
-import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, Toolbar } from "../components/page.jsx";
+import {
+  ErrorState,
+  FilterSelect,
+  LiveDot,
+  PageHeader,
+  ResultCount,
+  SearchInput,
+  StaleNotice,
+  Toolbar,
+} from "../components/page.jsx";
 import RecordModal from "../components/RecordModal.jsx";
-import { Badge, Button, Card, EmptyState, IconButton, Segmented, Skeleton, StatusBadge } from "../components/ui.jsx";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  IconButton,
+  Segmented,
+  Skeleton,
+  StatusBadge,
+  TextInput,
+} from "../components/ui.jsx";
 import { bookingFields, roomFields } from "../entities.jsx";
 import { useApi, useDebounced, useSort, useSSE } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { runAction, useCrud } from "../lib/crud.js";
-import { cx, fmtDate, fmtTimeRange, relativeDay } from "../lib/format.js";
-import { Calendar, Check, ChevronDown, Clock, Grid, Pencil, Plus, Rows, Search, Tool, Trash, Users } from "../lib/icons.jsx";
-import { confirmAction } from "../components/ConfirmDialog.jsx";
+import { cx, fmtDate, fmtTimeRange, minutesOf, relativeDay } from "../lib/format.js";
+import { busyWindows } from "../lib/rules.js";
+import { ArrowRight, Calendar, ChevronDown, Clock, Grid, Pencil, Plus, Rows, Search, Tool, Trash, Users } from "../lib/icons.jsx";
 
 const TYPES = ["classroom", "lab", "seminar"];
 const STATUSES = ["available", "unavailable"];
+const BUSY_TONE = {
+  booking: "bg-accent-soft text-accent-ink",
+  class: "bg-surface-3 text-ink-2",
+  event: "bg-caution-soft text-caution",
+};
 
 const Chip = ({ children }) => (
   <span className="inline-flex items-center rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-ink-2">

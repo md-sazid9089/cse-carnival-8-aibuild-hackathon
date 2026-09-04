@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPanel, { AssistantFab } from "./components/ChatPanel.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import ConfirmHost from "./components/ConfirmDialog.jsx";
 import Toast from "./components/Toast.jsx";
-import { IconButton, Kbd, Select } from "./components/ui.jsx";
-import { useMediaQuery, useTheme } from "./hooks.js";
+import { Button, IconButton, Kbd, Select } from "./components/ui.jsx";import { useMediaQuery, useTheme } from "./hooks.js";
 import { CampusProvider, PROFILES, useCampus } from "./lib/campus.jsx";
+import { useFocusTrap } from "./lib/focus.js";
 import { cx, initials } from "./lib/format.js";
 import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
 import Announcements from "./pages/Announcements.jsx";
@@ -14,6 +14,8 @@ import Events from "./pages/Events.jsx";
 import Overview from "./pages/Overview.jsx";
 import Rooms from "./pages/Rooms.jsx";
 import Schedules from "./pages/Schedules.jsx";
+import SignIn from "./pages/SignIn.jsx";
+import SignUp from "./pages/SignUp.jsx";
 
 const NAV = [
   { id: "overview", label: "Today", icon: Today },
@@ -23,6 +25,8 @@ const NAV = [
   { id: "announcements", label: "Announcements", icon: Megaphone },
   { id: "assignments", label: "Assignments", icon: Clipboard },
 ];
+
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "");
 
 function Brand() {
   return (
@@ -64,8 +68,8 @@ function NavList({ tab, onSelect }) {
   );
 }
 
-function ProfileSwitcher() {
-  const { profile, setProfile } = useCampus();
+function ProfileSwitcher({ onSignIn }) {
+  const { profile, setProfile, account, signOut } = useCampus();
   return (
     <div className="rounded-xl border border-line bg-surface-2 p-2.5">
       <div className="mb-2 flex items-center gap-2.5">
@@ -74,24 +78,37 @@ function ProfileSwitcher() {
         </span>
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
-          <span className="block text-[11px] text-ink-3 tabular">{profile.student_id}</span>
+          <span className="block text-[11px] text-ink-3 tabular">
+            {account ? account.role_id : profile.student_id}
+          </span>
         </span>
       </div>
-      <label htmlFor="profile-switcher" className="sr-only">
-        Acting as
-      </label>
-      <Select
-        id="profile-switcher"
-        value={profile.student_id}
-        onChange={(event) => setProfile(PROFILES.find((p) => p.student_id === event.target.value))}
-        className="h-8 text-[13px] normal-case"
-      >
-        {PROFILES.map((p) => (
-          <option key={p.student_id} value={p.student_id}>
-            {p.name}
-          </option>
-        ))}
-      </Select>
+      {account ? (
+        <Button size="sm" variant="ghost" className="w-full" onClick={signOut}>
+          Sign out
+        </Button>
+      ) : (
+        <>
+          <label htmlFor="profile-switcher" className="sr-only">
+            Acting as
+          </label>
+          <Select
+            id="profile-switcher"
+            value={profile.student_id}
+            onChange={(event) => setProfile(PROFILES.find((p) => p.student_id === event.target.value))}
+            className="h-8 text-[13px] normal-case"
+          >
+            {PROFILES.map((p) => (
+              <option key={p.student_id} value={p.student_id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" variant="ghost" className="mt-1.5 w-full" onClick={onSignIn}>
+            Sign in
+          </Button>
+        </>
+      )}
     </div>
   );
 }
@@ -101,13 +118,17 @@ function Shell() {
   const [navQuery, setNavQuery] = useState("");
   const [navKey, setNavKey] = useState(0);
   const [drawer, setDrawer] = useState(false);
-  const [palette, setPalette] = useState(false);
-  const isWide = useMediaQuery("(min-width: 1280px)");
-  const [chatOpen, setChatOpen] = useState(false);
+  const [palette, setPalette] = useState(false);  const [authView, setAuthView] = useState(null);  const isWide = useMediaQuery("(min-width: 1280px)");
+  const [chatOpen, setChatOpen] = useState(isWide);
   const { theme, toggle } = useTheme();
+  const drawerRef = useRef(null);
 
-  // The assistant is docked by default on wide screens, on demand everywhere else.
-  useEffect(() => setChatOpen(isWide), [isWide]);
+  useFocusTrap({ active: drawer, containerRef: drawerRef, onClose: () => setDrawer(false) });
+
+  // Auto-close when the dock no longer fits; never re-open a panel the user closed.
+  useEffect(() => {
+    if (!isWide) setChatOpen(false);
+  }, [isWide]);
 
   const navigate = useCallback((next, query = "") => {
     setTab(next);
@@ -118,10 +139,13 @@ function Shell() {
 
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setPalette((open) => !open);
-      }
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      // Don't hijack the shortcut away from a dialog or a field being typed in.
+      const target = event.target;
+      if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) return;
+      if (document.querySelector('[role="dialog"]:not([aria-label="Search CampusOS"])')) return;
+      event.preventDefault();
+      setPalette((open) => !open);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -135,6 +159,18 @@ function Shell() {
     announcements: <Announcements initialQuery={navQuery} />,
     assignments: <Assignments initialQuery={navQuery} />,
   };
+
+  // Signing in is optional: the dashboard is fully usable with the demo profiles.
+  if (authView) {
+    const goto = (target) => setAuthView(target === "signin" || target === "signup" ? target : null);
+    const Page = authView === "signup" ? SignUp : SignIn;
+    return (
+      <>
+        <Page onNavigate={goto} onSuccess={() => setAuthView(null)} />
+        <Toast />
+      </>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -160,11 +196,11 @@ function Shell() {
             <Search size={15} />
             Search
             <span className="ml-auto flex gap-1">
-              <Kbd>Ctrl</Kbd>
+              <Kbd>{IS_MAC ? "⌘" : "Ctrl"}</Kbd>
               <Kbd>K</Kbd>
             </span>
           </button>
-          <ProfileSwitcher />
+          <ProfileSwitcher onSignIn={() => setAuthView("signin")} />
         </div>
       </aside>
 
@@ -172,14 +208,20 @@ function Shell() {
       {drawer ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-overlay animate-fade-in" onClick={() => setDrawer(false)} aria-hidden="true" />
-          <div className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-line bg-surface px-3 py-4 shadow-lg animate-sheet">
+          <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+            className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-line bg-surface px-3 py-4 shadow-lg animate-sheet"
+          >
             <div className="flex items-center justify-between px-1.5 pb-4">
               <Brand />
               <IconButton icon={X} label="Close menu" onClick={() => setDrawer(false)} />
             </div>
             <NavList tab={tab} onSelect={navigate} />
             <div className="mt-auto pt-4">
-              <ProfileSwitcher />
+              <ProfileSwitcher onSignIn={() => setAuthView("signin")} />
             </div>
           </div>
         </div>
@@ -213,7 +255,7 @@ function Shell() {
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-375 flex-1 px-4 py-5 pb-28 sm:px-6 xl:pb-8">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-375 flex-1 px-4 py-5 pb-28 sm:px-6 xl:pb-8">
           <div key={`${tab}-${navKey}`}>{pages[tab]}</div>
         </main>
       </div>

@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { setProfile as setApiProfile } from "../api.js";
+import { clearAuth, getStoredToken, getStoredUser, setProfile as setApiProfile } from "../api.js";
 import { useApi } from "../hooks.js";
 import { toIso } from "./format.js";
 
-/** Demo identities. Identity is asserted by the client (single-user demo app),
- *  which the API mirrors back through X-Student-Id / X-Student-Name. */
+/** Demo identities for visitors who have not signed in. Identity is then asserted by the
+ *  client, which the API mirrors back through X-Student-Id / X-Student-Name; a signed-in
+ *  account replaces it with a server-issued token. */
 export const PROFILES = [
   { student_id: "20-40532", name: "Sakibul Hassan" },
   { student_id: "20-40511", name: "Farhan Ahmed" },
@@ -23,13 +24,29 @@ function loadProfile() {
   }
 }
 
+/** The stored user only counts as an account while a token backs it. */
+function loadAccount() {
+  return getStoredToken() ? getStoredUser() : null;
+}
+
 export function CampusProvider({ children }) {
-  const [profile, setProfileState] = useState(loadProfile);
+  const [account, setAccount] = useState(loadAccount);
+  const [demoProfile, setProfileState] = useState(loadProfile);
   // Set before first render effects so the very first request carries the identity.
   const [ready] = useState(() => {
-    setApiProfile(loadProfile());
+    if (!loadAccount()) setApiProfile(loadProfile());
     return true;
   });
+
+  useEffect(() => {
+    const onAuthChange = () => {
+      const next = loadAccount();
+      setAccount(next);
+      if (!next) setApiProfile(loadProfile());
+    };
+    window.addEventListener("campusos:auth_change", onAuthChange);
+    return () => window.removeEventListener("campusos:auth_change", onAuthChange);
+  }, []);
 
   const meta = useApi("/api/meta");
   const [tick, setTick] = useState(() => Date.now());
@@ -55,12 +72,18 @@ export function CampusProvider({ children }) {
     }
   };
 
+  const profile = account
+    ? { student_id: account.student_id ?? "", name: account.name, role: account.role_id }
+    : demoProfile;
+
   const value = useMemo(() => {
     const local = new Date();
     return {
       ready,
       profile,
       setProfile,
+      account,
+      signOut: clearAuth,
       // Server clock (campus timezone) with a local fallback so the UI still renders offline.
       today: meta.data?.today ?? toIso(local),
       weekday: meta.data?.weekday ?? local.toLocaleDateString(undefined, { weekday: "long" }),
@@ -68,7 +91,7 @@ export function CampusProvider({ children }) {
       timezone: meta.data?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, meta.data, ready, tick]);
+  }, [profile, account, meta.data, ready, tick]);
 
   return <CampusContext.Provider value={value}>{children}</CampusContext.Provider>;
 }
