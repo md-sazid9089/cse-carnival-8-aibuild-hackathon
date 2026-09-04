@@ -1,176 +1,100 @@
-# CampusOS — AI Build Hackathon
+# CampusOS — AUST CSE Campus Platform + AI Agent
 
-An intelligent university platform powered by an AI agent that understands and acts on real-time campus data.
+**Live demo:** [cse-carnival-8-aibuild-hackathon.vercel.app](https://cse-carnival-8-aibuild-hackathon.vercel.app/) · **API:** [cse-carnival-8-aibuild-hackathon.onrender.com](https://cse-carnival-8-aibuild-hackathon.onrender.com/api/meta)
 
----
+> ⏳ The free-tier backend sleeps when idle — the **first request can take 30–60 s** while it wakes up.
 
-## The Challenge
+## Overview
 
-Students struggle daily with scattered campus information — class changes buried in group chats, deadlines forgotten until the last minute, no easy way to know what's happening on campus right now.
+CampusOS keeps a student's campus life in one place: class schedules, rooms (with booking), events (with registration), announcements, and assignment deadlines — all stored in PostgreSQL and managed through a live dashboard. On top sits an **AI agent with real function calling**: it answers questions and takes actions (book a room, register for an event) by calling typed tools that read and write the same live database the dashboard uses. Nothing is cached — edit a record in the dashboard and the agent knows about it on the very next message.
 
-Your job: build **CampusOS** — a two-part app with a data dashboard and an AI agent that always reads live data.
-
-Read the full problem statement → [`PROBLEM_STATEMENT.md`](./PROBLEM_STATEMENT.md)
-
----
-
-## Repository Structure
-
-```
-campusos-hackathon/
-│
-├── README.md                    ← You are here
-├── PROBLEM_STATEMENT.md         ← Full problem statement + scoring
-├── SUBMISSION.md                ← How and where to submit
-│
-├── data/                        ← Seed data (load these into your backend)
-│   ├── schedules.json
-│   ├── rooms.json
-│   ├── events.json
-│   ├── announcements.json
-│   └── assignments.json
-│
-├── schema/
-│   └── schema.md                ← Field names, types, and constraints for all 5 systems
-│
-└── sample_queries/
-    └── sample_queries.md        ← Queries we will use when judging your agent
-```
-
----
-
-## How to Participate
-
-### 1. Fork the repository
-
-Click **Fork** in the top-right corner of this repo's GitHub page. This creates your own copy under your GitHub account, where you'll build your solution.
-
-### 2. Clone your fork
-
-```bash
-git clone https://github.com/YOUR_USERNAME/campusos-hackathon.git
-cd campusos-hackathon
-```
-
-### 3. Build your solution inside your fork
-
-> Your solution lives in your fork — do not open a pull request to this repo.
-
-### 4. Making your fork private
-
-By default, a fork is public. If you want to keep your work hidden from other participants while you build:
-
-1. Go to your fork on GitHub
-2. Open **Settings** (top of the repo page)
-3. Scroll to the **Danger Zone** at the bottom
-4. Click **Change repository visibility** → **Make private**
-5. Confirm by typing the repository name
-
-> **You may keep your fork private during the hackathon period, but it must be switched back to public by 8:30 PM on the submission deadline.** Repositories still private after that time will not be judged. To make it public again, repeat the steps above and choose **Make public** instead.
-
-### 5. Submit
-
-Submit your fork's public URL via the instructions in [`SUBMISSION.md`](./SUBMISSION.md).
-
----
-
-## Quick Links
-
-| Resource               | Link                                                                     |
-| ---------------------- | ------------------------------------------------------------------------ |
-| Full problem statement | [`PROBLEM_STATEMENT.md`](./PROBLEM_STATEMENT.md)                         |
-| Data schema            | [`schema/schema.md`](./schema/schema.md)                                 |
-| Sample agent queries   | [`sample_queries/sample_queries.md`](./sample_queries/sample_queries.md) |
-| Submission guide       | [`SUBMISSION.md`](./SUBMISSION.md)                                       |
-
----
-
-## Seed Data Overview
-
-| File                 | Records | What It Contains                                                  |
-| -------------------- | ------- | ----------------------------------------------------------------- |
-| `schedules.json`     | 24      | Class timetable — course, day, time, room, instructor             |
-| `rooms.json`         | 20      | Rooms 7A01–7A07, 7B01–7B08, 7C01–7C05 with equipment and bookings |
-| `events.json`        | 7       | Campus events with registration lists                             |
-| `announcements.json` | 8       | Notices with priority levels and expiry dates                     |
-| `assignments.json`   | 8       | Course assignments with deadlines and submission status           |
-
-> **Important:** These JSON files are only the starting/seed data — not the database itself. Load them into a real backend (a database, or at minimum a backend service with persistent storage) on app startup. Your dashboard and AI agent must both read from and write to that backend, not the static JSON files directly. If you add, edit, or delete a record, the change must be saved in your backend and still be there after a reload — the JSON files in this repo will not update. The agent is also expected to always query the current backend state, not a cached or hardcoded copy of the seed data.
-
----
-
-Good luck. Build something that actually works.
-
----
-
-# Our Solution — CampusOS
-
-Full-stack implementation: **FastAPI (Python) + PostgreSQL/pgvector + React (Vite + Tailwind)** with a **multi-agent AI assistant** (Router → Analyst/Coordinator over OpenRouter) that does real function calling against the live database. Design rationale: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) · Team split: [TEAM_PLAN.md](./TEAM_PLAN.md)
+The agent uses **multi-agent orchestration**: a fast Router model classifies each message, then dispatches to a read-only Analyst or a write-capable Coordinator with role-scoped toolsets — a question can never trigger a write, and vague requests ("book me any room") terminate at the router with a clarifying question.
 
 ## Tech Stack
 
-| Layer    | Tech                                                                                                                     |
-| -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Backend  | Python 3.11+, FastAPI, psycopg3 (plain SQL, no ORM)                                                                      |
-| Database | PostgreSQL 16 + pgvector (Docker) — seeded from `data/*.json` on first boot                                              |
-| AI       | OpenRouter — `z-ai/glm-5.2:free` specialists + `nvidia/nemotron-3.5-lightning:free` router; local `fastembed` embeddings |
-| Search   | Hybrid: Postgres `tsvector` + pgvector cosine, fused with Reciprocal Rank Fusion                                         |
-| Frontend | React 18, Vite, Tailwind CSS 4; live updates via Server-Sent Events                                                      |
+| Layer | Choice |
+|---|---|
+| Backend | Python 3.12+, FastAPI, uvicorn |
+| Database | PostgreSQL 16 + pgvector (Docker Compose locally, Neon in production) |
+| LLM | OpenRouter — `z-ai/glm-5.2:free` (specialists) + `nvidia/nemotron-3.5-lightning:free` (router), OpenAI-standard `tools`/`tool_calls` |
+| Search | Hybrid: Postgres full-text (`tsvector`) + local embeddings (fastembed, `bge-small-en-v1.5`) fused with Reciprocal Rank Fusion |
+| Frontend | React 18, Vite, Tailwind CSS 4, SSE for live updates |
+| Deploy | Vercel (frontend) + Render (API) + Neon (Postgres) |
 
-## Run It
+## Run Locally
 
-Prereqs: **Node 18+**, **Python 3.11+**, **Docker** (or any hosted Postgres URL, e.g. free [Neon](https://neon.tech) — pgvector supported).
+Prerequisites: **Node 18+**, **Python 3.12+**, **Docker Desktop** (or any Postgres 16 with pgvector).
 
 ```bash
-# 1. Database
+git clone https://github.com/md-sazid9089/cse-carnival-8-aibuild-hackathon.git
+cd cse-carnival-8-aibuild-hackathon
+
+# 1. Database (Docker; or set DATABASE_URL to any pgvector-enabled Postgres, e.g. free Neon)
 docker compose up -d
 
 # 2. Environment
-cp .env.example .env          # then put your OpenRouter API key in .env
+cp .env.example .env        # then edit .env: set OPENROUTER_API_KEY (free key at openrouter.ai)
 
-# 3. Backend deps (use a venv)
+# 3. Backend  (Windows: .venv\Scripts\activate)
+cd backend
 python -m venv .venv
-.venv\Scripts\activate        # Windows   |   source .venv/bin/activate  # macOS/Linux
-pip install -r backend/requirements.txt
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+# first boot: runs migrations, seeds the database from data/*.json, downloads the embedding model
 
-# 4. Frontend deps + run everything (backend :8000 + frontend :5173)
+# 4. Frontend (new terminal)
+cd client
 npm install
-cd client && npm install && cd ..
 npm run dev
 ```
 
-Open **http://localhost:5173**. Migrations + seeding run automatically on first boot; data persists across restarts.
+Open **http://localhost:5173**. The Vite dev server proxies `/api` to the backend on port 8000.
 
-Production build: `npm run build && npm start` → FastAPI serves the built client at http://localhost:8000.
+## Environment Variables
 
-## Environment Variables (`.env`)
+Copy [.env.example](.env.example) to `.env` (repo root). Never commit `.env`.
 
-| Key                       | Required | Notes                                                       |
-| ------------------------- | -------- | ----------------------------------------------------------- |
-| `DATABASE_URL`            | yes      | Default matches `docker-compose.yml`                        |
-| `OPENROUTER_API_KEY`      | yes      | Free at openrouter.ai/settings/keys                         |
-| `OPENROUTER_MODEL`        | no       | Specialist model (default `z-ai/glm-5.2:free`)              |
-| `OPENROUTER_ROUTER_MODEL` | no       | Router model (default `nvidia/nemotron-3.5-lightning:free`) |
-| `FALLBACK_SINGLE_AGENT`   | no       | `1` = single-agent loop instead of orchestration            |
-| `EMBEDDINGS_ENABLED`      | no       | `0` = keyword-only search (no model download)               |
+| Key | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres connection string (default matches docker-compose.yml, port **5433**) |
+| `OPENROUTER_API_KEY` | yes (for chat) | OpenRouter auth — dashboard works without it, agent chat doesn't |
+| `OPENROUTER_MODEL` | no | Specialist model (default `z-ai/glm-5.2:free`) |
+| `OPENROUTER_ROUTER_MODEL` | no | Router model (default `nvidia/nemotron-3.5-lightning:free`) |
+| `FALLBACK_SINGLE_AGENT` | no | `1` = bypass orchestration, single agent with all tools |
+| `EMBEDDINGS_ENABLED` | no | `0` = keyword-only search (saves ~200 MB RAM) |
+| `ALLOWED_ORIGINS` | no | Extra CORS origins for a separately hosted frontend (comma-separated) |
+| `TZ_NAME` | no | Timezone for "today/tomorrow" resolution (default `Asia/Dhaka`) |
+| `VITE_API_BASE` | deploy only | (Frontend, [client/.env.example](client/.env.example)) base URL of the hosted API |
 
 ## Using the Agent
 
-Chat panel is docked on the right. It reads/writes the **live database** through function calling — edit anything in the dashboard and ask about it immediately. Try:
+Chat lives in the right-hand panel. It always reads the live database and shows every tool call it makes as a chip above the answer. Try:
 
-- "When is my next class?" (cross-checks announcements for reschedules)
-- "Which labs have a projector and can fit at least 30 people?"
-- "Book Room 7A02 tomorrow from 3 PM to 5 PM." (verifies conflicts first)
-- "Register me for the Guest Lecture on Deep Learning."
-- "Just book me any room" → it will ask for specifics instead of guessing
-- Anything fuzzy: "any announcements about water problems?" (hybrid search)
+- *"When is my next class?"* — cross-checks announcements for reschedules automatically
+- *"What assignments do I have due this week?"*
+- *"Which labs have a projector and can fit at least 30 people?"*
+- *"Book Room 7A02 tomorrow from 3 PM to 5 PM."* — verifies the slot is free (bookings ∪ timetable ∪ events) before booking
+- *"Register me for the Guest Lecture on Deep Learning."* — registers the active profile; refuses full/cancelled events
+- *"Just book me any room."* — deliberately vague: the agent asks for details instead of acting
 
-Each reply shows **which agent** handled it (router / analyst / coordinator) and chips for every **tool call** made — proof of real function calling.
+Switch the acting student with the **"Acting as"** selector (bottom-left). Authorization is enforced server-side: you can only cancel your own bookings and registrations, and capacity/conflict rules cannot be bypassed by any phrasing — booking overlaps are ultimately rejected by a database `EXCLUDE` constraint.
 
-## Team
+## Project Structure
 
-| Member     | Ownership                                                          |
-| ---------- | ------------------------------------------------------------------ |
-| **Tayeb**  | AI chatbot (agents, prompts, tool calling) + UI refinement         |
-| **Shehab** | E2E testing, workflow fixes, data consistency, backend correctness |
-| **Sazid**  | Deployment (Docker/Neon/Render), run reliability, submission ops   |
+```
+backend/app/
+  main.py            # FastAPI bootstrap: migrations + seeding on startup
+  routers/api.py     # thin REST controllers (all 5 systems + agent + search + SSE)
+  services/          # ALL business rules: validation, conflicts, authorization
+  agents/            # orchestrator (router → analyst/coordinator), tool schemas, OpenRouter client
+  search/            # hybrid tsvector + pgvector search, local embedder
+  migrations/        # plain SQL, applied in order on boot
+client/src/          # React dashboard + chat panel
+data/                # seed JSON (read-only; loaded into Postgres on first boot)
+```
+
+## Deployment
+
+- **API (Render)**: [render.yaml](render.yaml) blueprint — root dir `backend`, health check `/api/meta`. Set `DATABASE_URL` (Neon), `OPENROUTER_API_KEY`, and `ALLOWED_ORIGINS` (your frontend URL).
+- **Frontend (Vercel)**: root directory `client`, framework Vite. Set `VITE_API_BASE` to the Render URL (rebuild required after changing it).
