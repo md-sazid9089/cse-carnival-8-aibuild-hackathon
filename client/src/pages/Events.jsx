@@ -49,9 +49,9 @@ function EventCard({ event, today, state, onRegister, onUnregister, onEdit, onDe
         <DateBlock iso={event.date} dimmed={closed} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className={cx("text-[15px] leading-snug font-semibold", closed ? "text-ink-2" : "text-ink")}>
+            <h2 className={cx("text-[15px] leading-snug font-semibold", closed ? "text-ink-2" : "text-ink")}>
               {event.name}
-            </h3>
+            </h2>
             <StatusBadge value={event.status} />
           </div>
           <p className="mt-1 text-[13px] text-ink-3 tabular">

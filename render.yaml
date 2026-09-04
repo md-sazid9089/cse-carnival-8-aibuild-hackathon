@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
+      - key: APP_ENV
+        value: production # requires AUTH_SECRET and drops the localhost CORS allowance
       - key: DATABASE_URL
         sync: false # paste your Postgres URL (Neon free tier works; needs pgvector)
       - key: OPENROUTER_API_KEYS
@@ -23,3 +25,7 @@ services:
         value: "1" # set to "0" if the instance runs out of memory
       - key: TZ_NAME
         value: Asia/Dhaka
+      - key: DEPARTMENT
+        value: CSE
+      - key: EMAIL_DOMAIN
+        value: aust.edu

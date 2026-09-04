@@ -8,7 +8,7 @@ import { useMediaQuery, useTheme } from "./hooks.js";
 import { CampusProvider, useCampus } from "./lib/campus.jsx";
 import { useFocusTrap } from "./lib/focus.js";
 import { cx, initials } from "./lib/format.js";
-import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
+import { Calendar, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
 import Announcements from "./pages/Announcements.jsx";
 import Assignments from "./pages/Assignments.jsx";
 import Events from "./pages/Events.jsx";
@@ -213,17 +213,14 @@ function Shell() {
               label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               onClick={toggle}
             />
-            <div className="hidden xl:block">
-              <IconButton
-                icon={chatOpen ? X : Chat}
-                label={chatOpen ? "Hide assistant" : "Show assistant"}
-                onClick={() => setChatOpen((open) => !open)}
-              />
-            </div>
           </div>
         </header>
 
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-375 flex-1 px-4 py-5 pb-28 sm:px-6 xl:pb-8">
+        <main
+          id="main"
+          tabIndex={-1}
+          className={cx("mx-auto w-full max-w-375 flex-1 px-4 py-5 sm:px-6", chatOpen ? "pb-8" : "pb-28")}
+        >
           <div key={`${tab}-${navKey}`}>{pages[tab]}</div>
         </main>
       </div>

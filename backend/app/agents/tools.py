@@ -244,7 +244,7 @@ def _run(name: str, args: dict, ctx: dict) -> dict:
                             f" on {booking['date']} {booking['start_time']}-{booking['end_time']} "
                             f"({booking['booking_id']})")
     if name == "cancel_booking":
-        b = rooms.cancel_booking(str(args["booking_id"]), requested_by=profile["name"], full_access=False)
+        b = rooms.cancel_booking(str(args["booking_id"]), requested_by=profile["name"])
         return _ok(b, f"cancelled booking {b['booking_id']}")
     if name == "register_for_event":
         ev = events.resolve_event(str(args.get("event") or args.get("event_id") or ""))

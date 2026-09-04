@@ -20,12 +20,11 @@ export function PageHeader({ title, blurb, actions, children }) {
 
 export function SearchInput({ value, onChange, placeholder = "Search…", id = "page-search" }) {
   return (
-    <div className="relative min-w-0 flex-1 sm:max-w-72">
+    <div className="relative min-w-0 basis-full sm:max-w-72 sm:basis-auto sm:flex-1">
       <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
       <input
         id={id}
-        type="text"
-        role="searchbox"
+        type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -53,7 +52,12 @@ export function FilterSelect({ label, allLabel, value, options, onChange }) {
       <label htmlFor={id} className="sr-only">
         Filter by {label}
       </label>
-      <Select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-auto min-w-32">
+      <Select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-auto min-w-30"
+      >
         <option value="">{allLabel ?? `All ${label.toLowerCase()}`}</option>
         {options.map((option) => (
           <option key={option} value={option}>
@@ -78,8 +82,9 @@ export function Toolbar({ children, right }) {
 export function ResultCount({ shown, total, noun }) {
   const filtered = shown !== total;
   return (
-    <p className="hidden text-[13px] text-ink-3 tabular sm:block" aria-live="polite">
-      {filtered ? `${shown} of ${total} ${noun}` : `${total} ${noun}`}
+    <p className="text-[13px] text-ink-2 tabular" aria-live="polite">
+      {filtered ? `${shown} of ${total}` : total}
+      <span className="hidden sm:inline"> {noun}</span>
     </p>
   );
 }
@@ -102,8 +107,7 @@ export function LiveDot({ active = false, className = "" }) {
         ) : null}
         <span className={cx("relative inline-flex size-2 rounded-full", tone.dot)} />
       </span>
-      <span className="hidden sm:inline">{tone.label}</span>
-      <span className="sr-only sm:hidden">{tone.label}</span>
+      {tone.label}
     </span>
   );
 }

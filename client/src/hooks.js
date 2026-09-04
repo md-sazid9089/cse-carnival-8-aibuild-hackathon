@@ -116,7 +116,7 @@ export function useSSE(entity, onChange) {
         closeTimer = setTimeout(() => {
           source?.close();
           source = null;
-          setStatus("connecting");
+          setStatus("offline");
         }, 5000);
       }
     };

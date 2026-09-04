@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import sse
 from .agents.gateway import gateway
@@ -14,10 +15,10 @@ from .agents.store import purge_old
 from .config import ALLOWED_ORIGINS, CLIENT_DIST
 from .db import migrate
 from .ratelimit import rate_limit_middleware
-from .routers.api import router
+from .routers.api import public, router
 from .search.embedder import warmup_async
 from .search.indexer import reindex_all
-from .seed import seed_if_empty, seed_rbac
+from .seed import seed_if_empty, seed_users
 from .services.common import DomainError
 
 log = logging.getLogger("campusos")
@@ -39,7 +40,7 @@ async def lifespan(app: FastAPI):
     sse.set_loop(asyncio.get_running_loop())
     migrate()
     seeded = seed_if_empty()
-    seed_rbac()
+    seed_users()
     gateway.restore()
     print(f"[startup] database ready (seeded={seeded}); agent keys: {len(gateway.keys)}")
     warmup_async()
@@ -82,6 +83,7 @@ async def unhandled_error_handler(request: Request, exc: Exception):
                                                   "detail": "Something went wrong on the server. Please try again."})
 
 
+app.include_router(public)
 app.include_router(router)
 
 
@@ -92,4 +94,19 @@ async def api_not_found(path: str):
 
 
 if CLIENT_DIST.exists():
-    app.mount("/", StaticFiles(directory=CLIENT_DIST, html=True), name="client")
+
+    class SpaStaticFiles(StaticFiles):
+        """Serve built assets, but hand unknown *routes* to index.html so paths like
+        /app survive a hard refresh. A miss on a real file (anything with an
+        extension) stays a 404 rather than returning HTML under a .js content type."""
+
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except StarletteHTTPException as exc:
+                looks_like_a_file = "." in path.rsplit("/", 1)[-1]
+                if exc.status_code == 404 and not looks_like_a_file:
+                    return await super().get_response("index.html", scope)
+                raise
+
+    app.mount("/", SpaStaticFiles(directory=CLIENT_DIST, html=True), name="client")

@@ -20,9 +20,24 @@ const RECORD_TABS = {
   announcement: { tab: "announcements", typeLabel: "Notice", icon: Megaphone },
   event: { tab: "events", typeLabel: "Event", icon: Ticket },
   assignment: { tab: "assignments", typeLabel: "Assignment", icon: Clipboard },
-  schedule: { tab: "schedules", typeLabel: "Class", icon: Calendar },
-  room: { tab: "rooms", typeLabel: "Room", icon: Door },
 };
+
+/**
+ * The search index stores one display string per record. Pull the record's own
+ * title back out of it so the term we navigate with actually matches a field the
+ * destination page filters on.
+ *   announcement / event -> "Title. Body (meta)"
+ *   assignment           -> "COURSE Course title: Title. Body (meta)"
+ */
+function parseIndexed(entityType, content) {
+  const text = String(content ?? "").trim();
+  const body = entityType === "assignment" && text.includes(":") ? text.slice(text.indexOf(":") + 1) : text;
+  const dot = body.indexOf(".");
+  return {
+    title: (dot >= 0 ? body.slice(0, dot) : body).trim(),
+    rest: (dot >= 0 ? body.slice(dot + 1) : "").trim(),
+  };
+}
 
 /** Ctrl/⌘K launcher: jumps between sections and searches live records. */
 export default function CommandPalette({ open, onClose, onNavigate }) {
@@ -88,25 +103,28 @@ export default function CommandPalette({ open, onClose, onNavigate }) {
           typeLabel: record.entity_type,
           icon: Search,
         };
-        const [head, ...rest] = String(record.content).split(" — ");
+        // The index stores one display string per record; recover the title from it.
+        const { title, rest } = parseIndexed(record.entity_type, record.content);
         return {
           kind: "record",
           key: `${record.entity_type}-${record.entity_id}`,
           tab: meta.tab,
           icon: meta.icon,
           typeLabel: meta.typeLabel,
-          // Navigate using the record's own title so the destination page's
+          // Navigate with the record's own title so the destination page's
           // substring filter always matches what was picked.
-          term: head.slice(0, 60),
-          label: head.slice(0, 90),
-          hint: rest.join(" — ").slice(0, 110) || "Open in its section",
+          term: title.slice(0, 40),
+          label: title.slice(0, 90),
+          hint: rest.slice(0, 110) || "Open in its section",
         };
       }),
     ],
     [pageMatches, records],
   );
 
-  useEffect(() => setActive(0), [items.length]);
+  const itemsKey = items.map((item) => item.key).join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setActive(0), [itemsKey]);
 
   useEffect(() => {
     if (!open) return undefined;

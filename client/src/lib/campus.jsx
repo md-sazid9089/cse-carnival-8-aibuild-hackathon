@@ -49,7 +49,6 @@ export function CampusProvider({ children }) {
     return {
       profile,
       account,
-      isTeacher: false,
       signOut: clearAuth,
       // Server clock (campus timezone) with a local fallback so the UI still renders offline.
       today: meta.data?.today ?? toIso(local),

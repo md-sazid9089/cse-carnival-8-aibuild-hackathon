@@ -65,13 +65,10 @@ export function clearAuth() {
   setAuth(null, "");
 }
 
-/** Identity headers for every call: a signed token when present, plus the acting profile. */
+/** The session token is the only thing that identifies a caller; the server ignores
+ *  anything the client claims about itself. */
 export function authHeaders() {
-  const headers = {};
-  if (currentToken) headers["Authorization"] = `Bearer ${currentToken}`;
-  if (currentProfile.student_id) headers["X-Student-Id"] = currentProfile.student_id;
-  if (currentProfile.name) headers["X-Student-Name"] = currentProfile.name;
-  return headers;
+  return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
 }
 
 /** FastAPI 422 bodies carry an array of validation objects; 5xx bodies can carry
@@ -110,6 +107,8 @@ async function request(method, path, body) {
   }
 
   const data = await res.json().catch(() => ({}));
+  // An expired or revoked session must drop us back to sign-in, not fail every panel silently.
+  if (res.status === 401 && currentToken) clearAuth();
   if (!res.ok) throw new Error(readError(res.status, data));
   return data;
 }

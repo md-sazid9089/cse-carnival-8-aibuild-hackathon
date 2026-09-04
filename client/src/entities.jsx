@@ -19,7 +19,13 @@ export const entities = {
     columns: [
       { key: "course", label: "Course", primary: true, sortable: true },
       { key: "title", label: "Title", wrap: true },
-      { key: "day", label: "Day", sortable: true, sortValue: (r) => DAYS.indexOf(r.day) },
+      {
+        key: "day",
+        label: "Day",
+        sortable: true,
+        // A class can be created on any weekday; unknown days sort last, not first.
+        sortValue: (r) => (DAYS.indexOf(r.day) === -1 ? DAYS.length : DAYS.indexOf(r.day)),
+      },
       {
         key: "start_time",
         label: "Time",

@@ -1,224 +1,237 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, setAuth, toast } from "../api.js";
+import AuthLayout from "../components/AuthLayout.jsx";
+import { Button, Field, Select, TextInput } from "../components/ui.jsx";
+import { cx } from "../lib/format.js";
 
 const DEPARTMENTS = ["CSE", "EEE", "ME", "CE", "TE", "Architecture", "BBA"];
+const MIN_PASSWORD = 6;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function strengthOf(password) {
+  if (!password) return null;
+  let score = 0;
+  if (password.length >= MIN_PASSWORD) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[^A-Za-z0-9]/.test(password) || (/[A-Za-z]/.test(password) && /\d/.test(password))) score += 1;
+  return [
+    { label: "Weak", bar: "bg-critical", width: "33%" },
+    { label: "Fair", bar: "bg-caution", width: "66%" },
+    { label: "Strong", bar: "bg-positive", width: "100%" },
+  ][Math.max(0, score - 1)];
+}
 
 export default function SignUp({ onNavigate, onSuccess }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [studentId, setStudentId] = useState("");
-  const [department, setDepartment] = useState("CSE");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [values, setValues] = useState({
+    name: "",
+    email: "",
+    studentId: "",
+    department: "CSE",
+    password: "",
+    confirmPassword: "",
+  });
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
+  const strength = useMemo(() => strengthOf(values.password), [values.password]);
+
+  const set = (key) => (e) => {
+    setValues((v) => ({ ...v, [key]: e.target.value }));
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
+
+  const validate = () => {
+    const next = {};
+    if (!values.name.trim()) next.name = "Enter your full name.";
+    if (!values.email.trim()) next.email = "Enter your email address.";
+    else if (!EMAIL_RE.test(values.email.trim())) next.email = "That doesn't look like a valid email address.";
+    if (!values.password) next.password = "Choose a password.";
+    else if (values.password.length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
+    if (values.confirmPassword !== values.password) next.confirmPassword = "Passwords don't match.";
+    return next;
+  };
 
   const handleSubmit = async (e) => {
-    e?.preventDefault();
-    if (!name.trim()) {
-      setError("Please enter your full name.");
-      return;
-    }
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-    if (!password || password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match. Please re-enter.");
+    e.preventDefault();
+    if (loading) return;
+
+    const next = validate();
+    setErrors(next);
+    setFormError(null);
+    if (Object.keys(next).length) {
+      document.getElementById(`signup-${Object.keys(next)[0]}`)?.focus();
       return;
     }
 
     setLoading(true);
-    setError(null);
     try {
       const res = await api.signup({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password,
-        student_id: studentId.trim() || undefined,
-        department,
+        name: values.name.trim(),
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        student_id: values.studentId.trim() || undefined,
+        department: values.department,
       });
-
       setAuth(res.user, res.token);
-      toast(`Registration successful! Account created as Student (${res.user.student_id})`, "success");
+      toast(`Account created — welcome, ${res.user.name}`, "success");
       if (onSuccess) onSuccess(res.user);
-      else if (onNavigate) onNavigate("overview");
+      else onNavigate?.("overview");
     } catch (err) {
-      setError(err.message || "Failed to create account. Please try again.");
-      toast(err.message || "Registration failed", "error");
+      setFormError(err.message || "We couldn't create your account. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex flex-col justify-center py-10 sm:px-6 lg:px-8 text-slate-100">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white text-2xl font-bold shadow-lg shadow-indigo-500/30 mb-3">
-            🎓
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Join CampusOS</h1>
-          <p className="mt-1 text-sm text-slate-400">Create your university student account</p>
-        </div>
-      </div>
-
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-slate-800/90 border border-slate-700/80 backdrop-blur-xl py-7 px-6 shadow-2xl rounded-2xl sm:px-10">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-3.5 mb-5">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Create Student Account</h2>
-              <p className="text-xs text-slate-400">Full Access Student Role Provisioning</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate && onNavigate("signin")}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium underline"
-            >
-              Have an account? Sign In
-            </button>
-          </div>
-
-          {/* Student Role Notice */}
-          <div className="mb-5 rounded-lg bg-indigo-950/60 border border-indigo-600/40 p-3 text-xs text-indigo-200">
-            <div className="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1">
-              <span>🎓</span> Role: Student (Full Access)
-            </div>
-            <p className="text-indigo-300/80">
-              New signups are assigned the <b>Student</b> role with complete access across course routines, room management, event registrations, announcements, and AI assistance.
+    <AuthLayout
+      eyebrow="Get started"
+      title="Create your student account"
+      subtitle="Takes a minute. You'll get your routine, room booking, event registration and the assistant."
+      footer={
+        <>
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={() => onNavigate?.("signin")}
+            className="font-medium text-accent underline-offset-2 hover:underline"
+          >
+            Sign in
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <div aria-live="polite">
+          {formError ? (
+            <p className="rounded-lg border border-critical/30 bg-critical-soft px-3.5 py-3 text-[13px] font-medium text-critical">
+              {formError}
             </p>
-          </div>
+          ) : null}
+        </div>
 
-          {error && (
-            <div className="mb-5 rounded-lg bg-rose-950/80 border border-rose-600/50 p-3 text-xs text-rose-200 flex items-start gap-2">
-              <span className="text-sm"></span>
-              <div className="flex-1">{error}</div>
-            </div>
+        <Field label="Full name" htmlFor="signup-name" required error={errors.name}>
+          {({ describedBy }) => (
+            <TextInput
+              id="signup-name"
+              value={values.name}
+              onChange={set("name")}
+              placeholder="Your full name"
+              autoComplete="name"
+              autoFocus
+              invalid={Boolean(errors.name)}
+              aria-describedby={describedBy}
+            />
           )}
+        </Field>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Full Name <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sakibul Hassan"
-                required
-                className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        <Field label="Email address" htmlFor="signup-email" required error={errors.email}>
+          {({ describedBy }) => (
+            <TextInput
+              id="signup-email"
+              type="email"
+              value={values.email}
+              onChange={set("email")}
+              placeholder="your university email"
+              autoComplete="email"
+              invalid={Boolean(errors.email)}
+              aria-describedby={describedBy}
+            />
+          )}
+        </Field>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Student ID" htmlFor="signup-studentId" hint="We'll assign one if you skip this.">
+            {({ describedBy }) => (
+              <TextInput
+                id="signup-studentId"
+                value={values.studentId}
+                onChange={set("studentId")}
+                placeholder="e.g. 00-00000"
+                aria-describedby={describedBy}
               />
-            </div>
+            )}
+          </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Email Address <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@aust.edu"
-                  required
-                  className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          <Field label="Department" htmlFor="signup-department" required>
+            <Select id="signup-department" value={values.department} onChange={set("department")}>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        <Field
+          label="Password"
+          htmlFor="signup-password"
+          required
+          error={errors.password}
+          hint={`At least ${MIN_PASSWORD} characters.`}
+        >
+          {({ describedBy }) => (
+            <>
+              <div className="relative">
+                <TextInput
+                  id="signup-password"
+                  type={showPassword ? "text" : "password"}
+                  value={values.password}
+                  onChange={set("password")}
+                  placeholder="Choose a secure password"
+                  autoComplete="new-password"
+                  className="pr-16"
+                  invalid={Boolean(errors.password)}
+                  aria-describedby={describedBy}
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Student ID <span className="text-slate-500 text-[10px]">(Optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. 20-40532"
-                  className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Department</label>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                {DEPARTMENTS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-slate-300">
-                  Password <span className="text-rose-400">*</span> <span className="text-[10px] text-slate-400">(min. 6 chars)</span>
-                </label>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-[11px] text-slate-400 hover:text-slate-200"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-2 my-auto h-6 rounded px-1.5 text-xs font-medium text-ink-3 transition-colors hover:text-ink"
                 >
                   {showPassword ? "Hide" : "Show"}
+                  <span className="sr-only"> password</span>
                 </button>
               </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Choose a secure password"
-                required
-                minLength={6}
-                className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+              {strength ? (
+                <p className="mt-2 flex items-center gap-2.5">
+                  <span className="h-1 flex-1 overflow-hidden rounded-full bg-surface-3">
+                    <span
+                      className={cx("block h-full rounded-full transition-[width] duration-300", strength.bar)}
+                      style={{ width: strength.width }}
+                    />
+                  </span>
+                  <span className="text-xs font-medium text-ink-3">{strength.label}</span>
+                </p>
+              ) : null}
+            </>
+          )}
+        </Field>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Confirm Password <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter password"
-                required
-                className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+        <Field label="Confirm password" htmlFor="signup-confirmPassword" required error={errors.confirmPassword}>
+          {({ describedBy }) => (
+            <TextInput
+              id="signup-confirmPassword"
+              type={showPassword ? "text" : "password"}
+              value={values.confirmPassword}
+              onChange={set("confirmPassword")}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              invalid={Boolean(errors.confirmPassword)}
+              aria-describedby={describedBy}
+            />
+          )}
+        </Field>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-lg bg-indigo-600 py-2.5 px-4 text-sm font-semibold text-white shadow hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? "Registering Student Account..." : "Sign Up as Student"}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-5 text-center">
-            <button
-              type="button"
-              onClick={() => onNavigate && onNavigate("signin")}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              ← Back to sign in
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
+          {loading ? "Creating account…" : "Create account"}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

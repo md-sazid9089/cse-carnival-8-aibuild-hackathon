@@ -125,7 +125,7 @@ export default function DataTable({
               {secondary.map((column) => (
                 <div key={column.key} className={cx("min-w-0", column.wrap && "col-span-2")}>
                   <dt className="text-[11px] font-medium tracking-wide text-ink-3 uppercase">{column.label}</dt>
-                  <dd className={cx("text-[13px] text-ink-2 tabular", column.wrap ? "break-words" : "truncate")}>
+                  <dd className={cx("text-[13px] text-ink-2 tabular", column.wrap ? "wrap-break-word" : "truncate")}>
                     {column.render ? column.render(row) : String(row[column.key] ?? "—")}
                   </dd>
                 </div>
@@ -137,7 +137,12 @@ export default function DataTable({
 
       {/* Tablet and up: full table. */}
       <div className="hidden overflow-hidden rounded-xl border border-line bg-surface shadow-xs md:block">
-        <div className="max-h-[calc(100vh-16rem)] overflow-auto">
+        <div
+          className="max-h-[calc(100vh-16rem)] overflow-auto"
+          tabIndex={0}
+          role="region"
+          aria-label={label ? `${label} table` : "Data table"}
+        >
           <table className="w-full border-collapse text-sm">
             {label ? <caption className="sr-only">{label}</caption> : null}
             <thead className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur">

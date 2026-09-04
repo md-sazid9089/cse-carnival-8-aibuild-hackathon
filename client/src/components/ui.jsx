@@ -6,7 +6,7 @@ import { Spinner } from "../lib/icons.jsx";
 
 const VARIANTS = {
   primary: "bg-ink text-ink-invert hover:bg-ink/88 shadow-xs",
-  secondary: "bg-surface text-ink border border-line hover:bg-surface-2 shadow-xs",
+  secondary: "bg-surface text-ink border border-line-control hover:bg-surface-2 shadow-xs",
   ghost: "text-ink-2 hover:bg-surface-3 hover:text-ink",
   accent: "bg-accent text-ink-invert hover:bg-accent-hover shadow-xs",
   danger: "text-critical hover:bg-critical-soft",
@@ -163,7 +163,7 @@ export const StatusBadge = ({ value, dot = false }) =>
 /* ------------------------------------------------------------- form parts */
 
 const CONTROL =
-  "w-full rounded-lg border border-line-control bg-surface px-3 text-sm text-ink transition-colors duration-150 " +
+  "rounded-lg border border-line-control bg-surface px-3 text-sm text-ink transition-colors duration-150 " +
   "hover:border-ink-3 disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
@@ -184,7 +184,7 @@ export function Field({ label, hint, error, required = false, htmlFor, className
             <span className="sr-only"> (required)</span>
           </>
         ) : (
-          <span className="ml-1 text-ink-3">(optional)</span>
+          <span className="ml-1 font-normal text-ink-3">{" (optional)"}</span>
         )}
       </label>
       {typeof children === "function" ? children({ describedBy: error || hint ? messageId : undefined }) : children}
@@ -206,7 +206,7 @@ export const TextInput = forwardRef(function TextInput({ className = "", invalid
     <input
       ref={ref}
       aria-invalid={invalid || undefined}
-      className={cx(CONTROL, "h-9", invalid && "border-critical", className)}
+      className={cx(CONTROL, "h-9 w-full", invalid && "border-critical", className)}
       {...rest}
     />
   );
@@ -218,7 +218,7 @@ export const TextArea = forwardRef(function TextArea({ className = "", invalid =
       ref={ref}
       rows={rows}
       aria-invalid={invalid || undefined}
-      className={cx(CONTROL, "resize-y py-2 leading-relaxed", invalid && "border-critical", className)}
+      className={cx(CONTROL, "w-full resize-y py-2 leading-relaxed", invalid && "border-critical", className)}
       {...rest}
     />
   );
@@ -229,7 +229,7 @@ export const Select = forwardRef(function Select({ className = "", invalid = fal
     <select
       ref={ref}
       aria-invalid={invalid || undefined}
-      className={cx(CONTROL, "select-caret h-9 pr-8", invalid && "border-critical", className)}
+      className={cx(CONTROL, "select-caret h-9 w-full pr-8", invalid && "border-critical", className)}
       {...rest}
     >
       {children}
@@ -253,7 +253,7 @@ export function Segmented({ options, value, onChange, label }) {
             title={opt.label}
             className={cx(
               "inline-flex items-center gap-1.5 rounded-[7px] px-2.5 h-7 text-[13px] font-medium transition-colors duration-150",
-              active ? "bg-surface text-ink shadow-xs" : "text-ink-3 hover:text-ink-2",
+              active ? "border border-line-control bg-surface text-ink shadow-xs" : "text-ink-2 hover:text-ink",
             )}
           >
             {opt.icon ? <opt.icon size={14} /> : null}
@@ -283,7 +283,7 @@ export function EmptyState({ icon: Icon, title, description, action, compact = f
 }
 
 export const Kbd = ({ children }) => (
-  <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] font-medium text-ink-3">
+  <kbd className="rounded border border-line-control bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] font-medium text-ink-2">
     {children}
   </kbd>
 );

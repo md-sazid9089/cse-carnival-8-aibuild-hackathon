@@ -26,7 +26,7 @@ import {
   TextInput,
 } from "../components/ui.jsx";
 import { bookingFields, roomFields } from "../entities.jsx";
-import { useApi, useDebounced, useSort, useSSE } from "../hooks.js";
+import { useApi, useDebounced, useMediaQuery, useSort, useSSE } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { runAction, useCrud } from "../lib/crud.js";
 import { cx, fmtDate, fmtTimeRange, minutesOf, relativeDay } from "../lib/format.js";
@@ -49,8 +49,10 @@ const Chip = ({ children }) => (
 
 /* ------------------------------------------------------- availability finder */
 
-function FreeRoomFinder({ today, onBook, invalidateKey }) {
-  const [open, setOpen] = useState(true);
+function FreeRoomFinder({ today, nowTime, onBook, invalidateKey }) {
+  // On a phone the expanded form would push every room below the fold.
+  const roomy = useMediaQuery("(min-width: 640px)");
+  const [open, setOpen] = useState(roomy);
   const [form, setForm] = useState({ date: today, start_time: "14:00", end_time: "16:00", min_capacity: "", equipment: "" });
   const [results, setResults] = useState(null);
   const [searched, setSearched] = useState(null);
@@ -127,7 +129,16 @@ function FreeRoomFinder({ today, onBook, invalidateKey }) {
               <TextInput id="finder-start" type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
             </Field>
             <Field label="To" htmlFor="finder-end" required error={error}>
-              <TextInput id="finder-end" type="time" value={form.end_time} onChange={(e) => set("end_time", e.target.value)} invalid={Boolean(error)} />
+              {({ describedBy }) => (
+                <TextInput
+                  id="finder-end"
+                  type="time"
+                  aria-describedby={describedBy}
+                  value={form.end_time}
+                  onChange={(e) => set("end_time", e.target.value)}
+                  invalid={Boolean(error)}
+                />
+              )}
             </Field>
             <Field label="Min seats" htmlFor="finder-cap">
               <TextInput
@@ -199,14 +210,15 @@ function FreeRoomFinder({ today, onBook, invalidateKey }) {
 function RoomCard({ room, today, weekday, schedules, events, profileName, nowMinutes, onBook, onEdit, onDelete, onCancelBooking }) {
   const [open, setOpen] = useState(false);
   const busy = busyWindows({ room, date: today, weekday, schedules, events });
-  const remaining = busy.filter((window) => minutesOf(window.end) > nowMinutes);
+  const remaining = busy.filter((window) => window.date === today && minutesOf(window.end) > nowMinutes);
+  const mine = busy.filter((window) => window.kind === "booking" && window.by === profileName);
   const unavailable = room.status !== "available";
 
   return (
     <Card interactive className="flex flex-col">
       <div className="flex items-start justify-between gap-2 px-4 pt-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold tracking-tight text-ink">{room.room_number}</h3>
+          <h2 className="text-base font-semibold tracking-tight text-ink">{room.room_number}</h2>
           <p className="mt-0.5 text-[13px] text-ink-3 capitalize">
             {room.type} · Floor {room.floor}
           </p>
@@ -223,6 +235,7 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
           <Calendar size={14} className="text-ink-3" />
           {remaining.length ? `${remaining.length} busy slot${remaining.length === 1 ? "" : "s"} left today` : "Free for the rest of today"}
         </span>
+        {mine.length ? <Badge tone="accent">{mine.length} booked by you</Badge> : null}
       </div>
 
       {room.equipment.length ? (
@@ -235,7 +248,7 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
         </div>
       ) : null}
 
-      <div className="mt-auto flex flex-wrap items-center gap-1 px-3 pt-4 pb-3">
+      <div className="mt-auto flex flex-wrap items-center gap-1 px-4 pt-4 pb-3">
         <Button size="sm" variant="secondary" icon={Clock} onClick={() => onBook(room)} disabled={unavailable}>
           Book
         </Button>
@@ -245,7 +258,7 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
           aria-expanded={open}
           className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink"
         >
-          Busy today
+          Schedule
           <span className="tabular">({busy.length})</span>
           <ChevronDown size={13} className={cx("transition-transform duration-200", open && "rotate-180")} />
         </button>
@@ -259,7 +272,7 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
             onClick={() => onDelete(room)}
           />
         </span>
-        {unavailable ? <p className="w-full px-1 pt-1 text-[12px] text-ink-2">Marked unavailable — bookings are refused.</p> : null}
+        {unavailable ? <p className="w-full pt-1 text-[12px] text-ink-2">Marked unavailable — bookings are refused.</p> : null}
       </div>
 
       {open ? (
@@ -267,22 +280,22 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
           {busy.length ? (
             <ul className="flex flex-col gap-2">
               {busy.map((window) => {
-                const mine = window.kind === "booking" && window.by === profileName;
+                const isMine = window.kind === "booking" && window.by === profileName;
                 return (
                   <li key={window.key} className="flex items-start justify-between gap-2 text-[13px]">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-1.5 font-medium text-ink tabular">
-                        {fmtTimeRange(window.start, window.end)}
+                      <p className="flex flex-wrap items-center gap-1.5 font-medium text-ink tabular">
+                        {relativeDay(window.date, today)} · {fmtTimeRange(window.start, window.end)}
                         <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase", BUSY_TONE[window.kind])}>
                           {window.kind}
                         </span>
                       </p>
                       <p className="truncate text-ink-2">
-                        {window.label} — {mine ? "you" : window.by}
+                        {window.label} — {isMine ? "you" : window.by}
                       </p>
                     </div>
                     {window.kind === "booking" ? (
-                      mine ? (
+                      isMine ? (
                         <Button size="sm" variant="danger" onClick={() => onCancelBooking(room, window.booking)}>
                           Cancel
                         </Button>
@@ -295,14 +308,8 @@ function RoomCard({ room, today, weekday, schedules, events, profileName, nowMin
               })}
             </ul>
           ) : (
-            <p className="text-[13px] text-ink-2">Nothing scheduled here today.</p>
+            <p className="text-[13px] text-ink-2">Nothing scheduled here today or later.</p>
           )}
-
-          {room.bookings.some((booking) => booking.date > today) ? (
-            <p className="mt-3 border-t border-line pt-2 text-[12px] text-ink-3">
-              Also booked later: {room.bookings.filter((b) => b.date > today).map((b) => relativeDay(b.date, today)).join(", ")}
-            </p>
-          ) : null}
         </div>
       ) : null}
     </Card>
@@ -320,6 +327,7 @@ export default function Rooms({ initialQuery = "" }) {
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
+  const [onlyMine, setOnlyMine] = useState(false);
   const [booking, setBooking] = useState(null);
   const [changeCount, setChangeCount] = useState(0);
   const search = useDebounced(query);
@@ -345,6 +353,7 @@ export default function Rooms({ initialQuery = "" }) {
     return rows.filter((room) => {
       if (type && room.type !== type) return false;
       if (status && room.status !== status) return false;
+      if (onlyMine && !room.bookings.some((b) => b.booked_by === profile.name && b.date >= today)) return false;
       if (!needle) return true;
       return (
         room.room_number.toLowerCase().includes(needle) ||
@@ -352,7 +361,16 @@ export default function Rooms({ initialQuery = "" }) {
         room.equipment.some((item) => item.toLowerCase().includes(needle))
       );
     });
-  }, [data, search, type, status]);
+  }, [data, search, type, status, onlyMine, profile.name, today]);
+
+  const myBookingCount = useMemo(
+    () =>
+      (data ?? []).reduce(
+        (total, room) => total + room.bookings.filter((b) => b.booked_by === profile.name && b.date >= today).length,
+        0,
+      ),
+    [data, profile.name, today],
+  );
 
   const columns = [
     { key: "room_number", label: "Room", primary: true, sortable: true },
@@ -427,12 +445,26 @@ export default function Rooms({ initialQuery = "" }) {
           <SearchInput value={query} onChange={setQuery} placeholder="Search room or equipment" id="search-rooms" />
           <FilterSelect label="Type" allLabel="Any type" options={TYPES} value={type} onChange={setType} />
           <FilterSelect label="Status" allLabel="Any status" options={STATUSES} value={status} onChange={setStatus} />
+          <button
+            type="button"
+            onClick={() => setOnlyMine((value) => !value)}
+            aria-pressed={onlyMine}
+            className={cx(
+              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium transition-colors",
+              onlyMine
+                ? "border-accent bg-accent-soft text-accent-ink"
+                : "border-line-control bg-surface text-ink-2 hover:border-ink-3",
+            )}
+          >
+            Booked by you
+            <span className="tabular">({myBookingCount})</span>
+          </button>
         </Toolbar>
       </PageHeader>
 
       <StaleNotice message={staleError} onRetry={refresh} />
 
-      <FreeRoomFinder today={today} onBook={openBookingByNumber} invalidateKey={changeCount} />
+      <FreeRoomFinder today={today} nowTime={nowTime} onBook={openBookingByNumber} invalidateKey={changeCount} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
@@ -530,7 +562,12 @@ export default function Rooms({ initialQuery = "" }) {
           submitLabel="Confirm booking"
           onSubmit={submitBooking}
           onClose={() => setBooking(null)}
-          validate={(form) => (form.date < today ? { date: "Pick today or a future date" } : {})}
+          validate={(form) => {
+            if (form.date < today) return { date: "Pick today or a future date" };
+            if (form.date === today && form.start_time && form.start_time < nowTime)
+              return { start_time: "That time has already passed today" };
+            return {};
+          }}
         />
       ) : null}
     </div>

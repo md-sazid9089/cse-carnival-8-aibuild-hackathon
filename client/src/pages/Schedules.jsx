@@ -26,7 +26,7 @@ function ClassCard({ row, isNow, onEdit, onDelete }) {
         className="block w-full text-left"
         aria-label={`Edit ${row.course} ${row.title}`}
       >
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline justify-between gap-2 pr-8">
           <span className="text-sm font-semibold text-ink">{row.course}</span>
           <span className="text-[11px] font-medium text-ink-3">{row.section}</span>
         </div>
@@ -68,7 +68,7 @@ function ClassCard({ row, isNow, onEdit, onDelete }) {
 function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
   if (loading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {DAYS.map((day) => (
           <div key={day} className="space-y-2">
             <Skeleton className="h-4 w-20" />
@@ -86,7 +86,7 @@ function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
   const columns = [...DAYS, ...extraDays];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       {columns.map((day) => {
         const classes = rows
           .filter((row) => row.day === day)

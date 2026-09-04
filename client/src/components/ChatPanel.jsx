@@ -431,17 +431,21 @@ export default function ChatPanel({ open, onClose }) {
   );
 }
 
+/** The one way in to the assistant, on every breakpoint: a floating launcher you cannot miss. */
 export function AssistantFab({ onClick, hidden }) {
   if (hidden) return null;
   return (
-    <Button
-      onClick={onClick}
-      variant="primary"
-      size="lg"
-      icon={Sparkle}
-      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 rounded-full shadow-lg xl:hidden"
-    >
-      Assistant
-    </Button>
+    <div className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 sm:right-6 sm:bottom-6">
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full bg-accent opacity-0 animate-beacon" />
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label="Open campus assistant"
+        className="relative inline-flex h-13 items-center gap-2.5 rounded-full bg-accent pr-5 pl-4 text-sm font-semibold text-ink-invert shadow-lg transition-[background-color,transform] duration-150 ease-out-soft hover:bg-accent-hover active:scale-95"
+      >
+        <Sparkle size={19} />
+        Ask AI
+      </button>
+    </div>
   );
 }

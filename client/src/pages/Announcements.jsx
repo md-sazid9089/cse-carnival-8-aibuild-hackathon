@@ -31,9 +31,9 @@ function NoticeCard({ notice, today, expired, onEdit, onDelete }) {
       <span className={cx("w-1 shrink-0", expired ? "bg-line-strong" : ACCENT[notice.priority])} aria-hidden="true" />
       <div className="min-w-0 flex-1 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className={cx("text-[15px] leading-snug font-semibold", expired ? "text-ink-2" : "text-ink")}>
+          <h2 className={cx("text-[15px] leading-snug font-semibold", expired ? "text-ink-2" : "text-ink")}>
             {notice.title}
-          </h3>
+          </h2>
           <div className="flex shrink-0 items-center gap-1.5">
             <StatusBadge value={notice.priority} dot />
             {expired ? <Badge>Expired</Badge> : null}
@@ -41,7 +41,7 @@ function NoticeCard({ notice, today, expired, onEdit, onDelete }) {
         </div>
 
         <p className={cx("mt-2 text-[13px] leading-relaxed text-ink-2", !expanded && "line-clamp-3")}>{notice.body}</p>
-        {notice.body.length > 160 ? (
+        {notice.body.length > 110 ? (
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
