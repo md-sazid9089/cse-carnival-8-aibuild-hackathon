@@ -146,7 +146,7 @@ export default function App() {
                   : "hover:bg-slate-800/60 text-slate-300"
               }`}
             >
-              <span className="text-base">{n.icon}</span> {n.label}
+              <n.icon className="text-base shrink-0" /> {n.label}
             </button>
           ))}
         </div>
