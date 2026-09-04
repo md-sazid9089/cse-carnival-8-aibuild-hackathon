@@ -35,7 +35,7 @@ export function Section({
 }: SectionProps) {
   const centered = align === "center";
   return (
-    <section id={id} className={cn("scroll-mt-24 py-20 sm:py-28", tones[tone], className)} {...props}>
+    <section id={id} className={cn("scroll-mt-24 py-16 sm:py-20", tones[tone], className)} {...props}>
       <Container>
         <Reveal className={cn("max-w-2xl", centered && "mx-auto text-center")}>
           {eyebrow && (
@@ -62,7 +62,7 @@ export function Section({
             </p>
           )}
         </Reveal>
-        <div className="mt-14">{children}</div>
+        <div className="mt-10">{children}</div>
       </Container>
     </section>
   );

@@ -8,7 +8,7 @@ import secrets
 import time
 
 from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S, EMAIL_DOMAIN
-from ..db import execute, q, q1
+from ..db import execute, q1
 from . import schedules
 from .common import DomainError
 
@@ -213,14 +213,4 @@ def get_me(user_id: str) -> dict:
         raise DomainError("NOT_FOUND", "User not found", 404)
     user["permissions"] = get_user_permissions(user["role_id"])
     return user
-
-
-def list_users() -> list[dict]:
-    rows = q(
-        """SELECT id, role_id, student_id, employee_id, name, email, department, status, created_at
-           FROM users ORDER BY role_id, name"""
-    )
-    for r in rows:
-        r["permissions"] = get_user_permissions(r["role_id"])
-    return rows
 

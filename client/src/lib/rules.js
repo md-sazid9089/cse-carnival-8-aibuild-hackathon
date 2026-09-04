@@ -18,11 +18,6 @@ export function registrationState(event, studentId) {
   return { registered, blocked, reason, full, closed };
 }
 
-export function bookingState(room) {
-  const unavailable = room.status !== "available";
-  return { blocked: unavailable, reason: unavailable ? "Marked unavailable" : null };
-}
-
 /**
  * Everything that occupies a room: today's classes and events, plus every
  * booking from today onwards. Future bookings are included so a student can

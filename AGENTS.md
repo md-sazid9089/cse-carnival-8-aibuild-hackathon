@@ -10,7 +10,7 @@ Before making ANY implementation change, read — in full — the documents rele
 | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `PROBLEM_STATEMENT.md` (requirements + scoring rubric)      | `schema/schema.md` — any data model, service, migration, or form change |
 | `docs/ARCHITECTURE.md` (every design decision + why)        | `sample_queries/sample_queries.md` — any agent/prompt/tool change       |
-| `TEAM_PLAN.md` (ownership — don't step on teammates' areas) | `SUBMISSION.md` — README, env, deployment, or submission work           |
+| `docs/TEAM_PLAN.md` (ownership — don't step on teammates' areas) | `SUBMISSION.md` — README, env, deployment, or submission work           |
 
 Do not begin editing until you can state which rubric line (R1–R13 in `docs/ARCHITECTURE.md`) the change serves. If the docs and the code disagree, the docs describe intent — flag the discrepancy, then fix whichever is wrong.
 

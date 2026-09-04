@@ -24,11 +24,6 @@ function loadStoredToken() {
 let currentToken = loadStoredToken();
 // A stored user only counts while a token backs it — there is no anonymous identity.
 let currentUser = currentToken ? loadStoredUser() : null;
-let currentProfile = {
-  student_id: currentUser?.student_id || "",
-  name: currentUser?.name || "",
-  role: currentUser?.role_id || "",
-};
 
 export function getStoredUser() {
   return currentUser;
@@ -38,18 +33,9 @@ export function getStoredToken() {
   return currentToken;
 }
 
-export function setProfile(p) {
-  currentProfile = { ...currentProfile, ...p };
-}
-
 export function setAuth(user, token) {
   currentUser = user;
   currentToken = token || "";
-  currentProfile = {
-    student_id: user?.student_id || "",
-    name: user?.name || "User",
-    role: user?.role_id || "student",
-  };
   try {
     if (user) localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_USER_KEY);

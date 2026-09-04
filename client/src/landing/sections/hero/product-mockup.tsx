@@ -53,11 +53,12 @@ export function ProductMockup() {
   return (
     <div ref={ref} className="relative">
       {/* floating accents */}
+      {/* Hangs above the window frame — overlapping the panel would cover the sidebar nav. */}
       <motion.div
         aria-hidden
-        className="absolute top-16 -left-4 hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-lg lg:block"
-        initial={{ opacity: 0, x: -12 }}
-        animate={inView ? { opacity: 1, x: 0 } : undefined}
+        className="absolute -top-9 left-10 hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-lg lg:block"
+        initial={{ opacity: 0, y: -10 }}
+        animate={inView ? { opacity: 1, y: 0 } : undefined}
         transition={{ delay: 0.9, duration: 0.5 }}
       >
         <div className="animate-float">

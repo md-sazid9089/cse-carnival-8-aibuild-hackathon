@@ -1,7 +1,7 @@
 """Shared validation + the domain error type routers/tools translate uniformly."""
 import re
 from datetime import date as date_cls
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from ..config import TZ_NAME
@@ -18,10 +18,6 @@ def now_local() -> datetime:
 
 def today_local() -> date_cls:
     return now_local().date()
-
-
-def date_in(days: int) -> date_cls:
-    return today_local() + timedelta(days=days)
 
 
 class DomainError(Exception):

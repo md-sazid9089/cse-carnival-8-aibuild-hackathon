@@ -213,6 +213,15 @@
     text-wrap: balance;
   }
 
+  /* Record content is user-supplied: a single long token must never widen the layout. */
+  h2, h3, h4, h5, h6, p, li, dd, dt, td, th, label, figcaption, blockquote {
+    overflow-wrap: anywhere;
+  }
+  /* Page titles keep their word as the minimum — breaking one mid-word looks broken. */
+  h1 {
+    overflow-wrap: break-word;
+  }
+
   /* One consistent, always-visible focus ring. Never removed without a replacement. */
   :focus-visible {
     outline: 2px solid var(--accent);

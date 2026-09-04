@@ -31,7 +31,7 @@ function NoticeCard({ notice, today, expired, onEdit, onDelete }) {
       <span className={cx("w-1 shrink-0", expired ? "bg-line-strong" : ACCENT[notice.priority])} aria-hidden="true" />
       <div className="min-w-0 flex-1 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className={cx("text-[15px] leading-snug font-semibold", expired ? "text-ink-2" : "text-ink")}>
+          <h2 className={cx("min-w-0 text-[15px] leading-snug font-semibold", expired ? "text-ink-2" : "text-ink")}>
             {notice.title}
           </h2>
           <div className="flex shrink-0 items-center gap-1.5">

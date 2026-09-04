@@ -443,9 +443,9 @@ export function AssistantFab({ onClick, hidden }) {
         type="button"
         onClick={onClick}
         aria-label="Open campus assistant"
-        className="relative inline-flex h-13 items-center gap-2.5 rounded-full bg-accent pr-5 pl-4 text-sm font-semibold text-ink-invert shadow-lg transition-[background-color,transform] duration-150 ease-out-soft hover:bg-accent-hover active:scale-95"
+        className="relative inline-flex h-12 items-center gap-2 rounded-full bg-accent pr-4.5 pl-4 text-sm font-medium text-ink-invert shadow-md transition-[background-color,transform] duration-150 ease-out-soft hover:bg-accent-hover active:scale-95"
       >
-        <Sparkle size={19} />
+        <Sparkle size={17} />
         Ask AI
       </button>
     </div>

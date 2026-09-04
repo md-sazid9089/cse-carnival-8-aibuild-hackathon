@@ -117,7 +117,7 @@ const TONES = {
 
 /** Domain status/priority -> tone. Colour is never the only signal: the label
  *  itself always carries the meaning. */
-export const toneOf = (value) =>
+const toneOf = (value) =>
   ({
     high: "critical",
     medium: "caution",

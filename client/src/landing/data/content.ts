@@ -3,13 +3,7 @@ import {
   BookOpenCheck,
   CalendarDays,
   DoorOpen,
-  Eye,
-  Layers,
-  MessageCircleQuestion,
-  Search,
-  ShieldCheck,
   Ticket,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,7 +17,7 @@ export const NAV_LINKS = [
 export const APP_PATH = "/overview";
 export const SIGN_IN_PATH = "/auth/signin";
 
-export type CampusSystem = {
+type CampusSystem = {
   id: "schedule" | "rooms" | "events" | "announcements" | "assignments";
   title: string;
   description: string;
@@ -51,7 +45,7 @@ export const SCATTERED_SOURCES = [
   { label: "Event poster", detail: "Seen once in a hallway", tint: "bg-surface" },
 ] as const;
 
-export type Conversation = {
+type Conversation = {
   id: string;
   prompt: string;
   reply: string;
@@ -97,35 +91,6 @@ export const CONVERSATIONS: Conversation[] = [
   },
 ];
 
-export type Capability = { title: string; description: string; icon: LucideIcon };
-
-export const CAPABILITIES: Capability[] = [
-  { title: "Ask", description: "Get answers from current campus data.", icon: MessageCircleQuestion },
-  { title: "Search", description: "Find rooms, events, classes, and assignments.", icon: Search },
-  { title: "Understand", description: "Combine information from multiple campus systems.", icon: Layers },
-  { title: "Act", description: "Book rooms and register for events.", icon: Zap },
-  { title: "Clarify", description: "Ask follow-up questions when requests are ambiguous.", icon: Eye },
-  { title: "Protect", description: "Refuse unauthorized or unsafe actions.", icon: ShieldCheck },
-];
-
-export const WORKFLOW_STEPS = [
-  "Understand request",
-  "Check room capacity",
-  "Check projector availability",
-  "Check schedule",
-  "Check availability",
-  "Book room",
-] as const;
-
-export const WORKFLOW_RAIL = [
-  "You ask",
-  "AI understands",
-  "Campus data checked",
-  "Action validated",
-  "Action executed",
-  "You get confirmation",
-] as const;
-
 export const EDGE_CASES = [
   {
     title: "Ambiguous request",
@@ -147,64 +112,6 @@ export const EDGE_CASES = [
     user: "When is my CSE999 class?",
     ai: "I couldn’t find that course in the current campus data. Could the code be different?",
   },
-] as const;
-
-export const HOW_IT_WORKS = [
-  {
-    step: "01",
-    title: "Connect",
-    description: "Campus information lives inside one centralized platform — the database is the single source of truth.",
-  },
-  {
-    step: "02",
-    title: "Understand",
-    description: "The AI agent reads the latest campus data through real tool calls, every single time it answers.",
-  },
-  {
-    step: "03",
-    title: "Act",
-    description: "It answers questions and performs authorized actions — then tells you exactly what it did.",
-  },
-] as const;
-
-export const COMPARISON = [
-  {
-    title: "Traditional university systems",
-    items: ["Information scattered", "Static interfaces", "Manual searching", "No natural language", "Limited automation"],
-    highlight: false,
-  },
-  {
-    title: "Generic AI chatbot",
-    items: [
-      "May hallucinate",
-      "Doesn’t know current campus data",
-      "Cannot safely perform campus actions",
-      "No structured source of truth",
-    ],
-    highlight: false,
-  },
-  {
-    title: "CampusOS",
-    items: [
-      "Centralized campus data",
-      "Current backend state",
-      "Real tool calling",
-      "Natural language interface",
-      "Real actions",
-      "Permission-aware",
-      "Clarifies ambiguity",
-    ],
-    highlight: true,
-  },
-] as const;
-
-export const RELIABILITY = [
-  { title: "Current data", description: "Every answer reads the database at call time. Nothing is cached." },
-  { title: "Permission-aware", description: "Actions are checked against who you are and what you own." },
-  { title: "Tool-based operations", description: "Reads and writes go through the same services the dashboard uses." },
-  { title: "No guessing", description: "If a detail is missing, the agent asks instead of inventing it." },
-  { title: "Validation before mutation", description: "Availability, capacity and ownership are verified first." },
-  { title: "Honest failure states", description: "When something can’t be done, it says so — with the reason." },
 ] as const;
 
 export const FOOTER_LINKS = [

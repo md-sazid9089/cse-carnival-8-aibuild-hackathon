@@ -1,7 +1,7 @@
 import { motion, useReducedMotion, type HTMLMotionProps, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
 
-export const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
 type RevealProps = HTMLMotionProps<"div"> & {
   children: ReactNode;

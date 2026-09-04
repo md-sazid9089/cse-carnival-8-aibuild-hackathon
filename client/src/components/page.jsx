@@ -7,7 +7,8 @@ export function PageHeader({ title, blurb, actions, children }) {
   return (
     <header className="mb-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* basis keeps the title readable: the actions wrap below it instead of squeezing it. */}
+        <div className="min-w-0 shrink grow basis-56">
           <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink sm:text-[28px]">{title}</h1>
           {blurb ? <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ink-3">{blurb}</p> : null}
         </div>
@@ -74,7 +75,7 @@ export function Toolbar({ children, right }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {children}
-      {right ? <div className="ml-auto flex items-center gap-2">{right}</div> : null}
+      {right ? <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">{right}</div> : null}
     </div>
   );
 }

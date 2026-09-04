@@ -117,12 +117,6 @@ export const ChevronDown = (p) => (
   </Svg>
 );
 
-export const ChevronRight = (p) => (
-  <Svg {...p}>
-    <path d="m9 6 6 6-6 6" />
-  </Svg>
-);
-
 export const ArrowRight = (p) => (
   <Svg {...p}>
     <path d="M4 12h16M14 6l6 6-6 6" />
@@ -139,12 +133,6 @@ export const Sun = (p) => (
 export const Moon = (p) => (
   <Svg {...p}>
     <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
-  </Svg>
-);
-
-export const Chat = (p) => (
-  <Svg {...p}>
-    <path d="M20 12.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 3v-4.4A7.5 7.5 0 0 1 12.5 5 7.5 7.5 0 0 1 20 12.5Z" />
   </Svg>
 );
 
