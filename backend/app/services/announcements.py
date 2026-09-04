@@ -1,7 +1,7 @@
 from .. import sse
 from ..db import execute, next_id, q, q1
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, require
+from .common import DomainError, check_date, check_enum, require, today_local
 
 FIELDS = ["title", "body", "date", "priority", "posted_by", "expires"]
 PRIORITIES = ["high", "medium", "low"]
@@ -12,7 +12,8 @@ def list_announcements(priority: str | None = None, include_expired: bool = Fals
     if priority:
         conds.append("priority = %s"); params.append(priority)
     if not include_expired:
-        conds.append("expires >= CURRENT_DATE")
+        # campus date, not the database's UTC CURRENT_DATE
+        conds.append("expires >= %s"); params.append(today_local())
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY date DESC, priority", params)

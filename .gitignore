@@ -9,6 +9,7 @@ env/
 # Environment
 .env
 *.env.local
+.ecc/
 
 # Build outputs
 dist/

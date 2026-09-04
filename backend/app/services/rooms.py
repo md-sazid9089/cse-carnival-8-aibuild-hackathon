@@ -1,9 +1,11 @@
+import re
+
 import psycopg.errors
 
 from .. import sse
 from ..db import execute, next_id, pool, q, q1, ser_row
-from .common import (DomainError, check_date, check_enum, check_time, check_time_order, require, to_int,
-                     to_str_list, weekday_name)
+from .common import (DomainError, check_date, check_enum, check_time, check_time_order, now_local, parse_time,
+                     require, to_int, to_str_list, weekday_name)
 
 FIELDS = ["room_number", "type", "capacity", "equipment", "floor", "status"]
 TYPES = ["classroom", "lab", "seminar"]
@@ -39,7 +41,9 @@ def get_room(rid: str) -> dict:
 
 
 def get_room_by_number(room_number: str) -> dict:
-    row = q1("SELECT * FROM rooms WHERE room_number = %s", [room_number])
+    # tolerate '7a02', 'Room 7A-02', ' 7a 02 '
+    cleaned = re.sub(r"(?i)^\s*room\s*", "", str(room_number)).replace("-", "").replace(" ", "").strip()
+    row = q1("SELECT * FROM rooms WHERE upper(room_number) = upper(%s)", [cleaned])
     if not row:
         raise DomainError("NOT_FOUND", f"Room {room_number} does not exist", 404)
     row["bookings"] = _bookings(row["id"])
@@ -108,32 +112,45 @@ def conflict_reason(room_number: str, date: str, start: str, end: str) -> str | 
     if s:
         return f"Conflicts with {s['course']} class on {day} ({s['start_time']}–{s['end_time']})"
     e = q1(
-        """SELECT name, start_time, end_time FROM events
-           WHERE venue = %s AND date = %s AND status NOT IN ('cancelled','completed')
-             AND start_time < %s AND %s < end_time LIMIT 1""",
-        [room_number, date, end, start],
+        """SELECT name, date, end_date, start_time, end_time FROM events
+           WHERE venue = %s AND status NOT IN ('cancelled','completed')
+             AND date <= %s AND end_date >= %s
+             AND (CASE
+                    WHEN date = end_date THEN (start_time < %s AND %s < end_time)
+                    WHEN date = %s THEN start_time < %s          -- first day: from start_time to midnight
+                    WHEN end_date = %s THEN %s < end_time        -- last day: midnight to end_time
+                    ELSE true                                    -- middle day of a multi-day event
+                  END)
+           LIMIT 1""",
+        [room_number, date, date, end, start, date, end, date, start],
     )
     if e:
-        return f"Conflicts with event \"{e['name']}\" ({e['start_time']}–{e['end_time']})"
+        span = "" if e["date"] == e["end_date"] else f" ({e['date']}\u2192{e['end_date']})"
+        return f"Conflicts with event \"{e['name']}\"{span} ({e['start_time']}\u2013{e['end_time']})"
     return None
 
 
 def add_booking(room_number: str, data: dict, booked_by: str) -> dict:
-    require(data, ["date", "start_time", "end_time", "purpose"])
+    require(data, ["date", "start_time", "end_time"])
     check_date(data["date"], "date")
-    check_time(data["start_time"], "start_time")
-    check_time(data["end_time"], "end_time")
-    check_time_order(data["start_time"], data["end_time"])
+    start = parse_time(data["start_time"], "start_time")
+    end = parse_time(data["end_time"], "end_time")
+    check_time_order(start, end)
+    purpose = str(data.get("purpose") or "Booked via CampusOS").strip()[:200]
+    now = now_local()
+    if f"{data['date']} {start}" <= now.strftime("%Y-%m-%d %H:%M"):
+        raise DomainError("PAST_TIME",
+                          f"{data['date']} {start} is in the past (campus time is {now:%Y-%m-%d %H:%M}); pick a future slot")
     room = get_room_by_number(room_number)
-    reason = conflict_reason(room_number, data["date"], data["start_time"], data["end_time"])
+    reason = conflict_reason(room["room_number"], data["date"], start, end)
     if reason:
         raise DomainError("ROOM_CONFLICT", reason, 409)
     bid = next_id_booking()
     try:
         execute("INSERT INTO bookings VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                [bid, room["id"], booked_by, data["date"], data["start_time"], data["end_time"], data["purpose"]])
+                [bid, room["id"], booked_by, data["date"], start, end, purpose])
     except psycopg.errors.ExclusionViolation as exc:  # DB-level last line of defense
-        raise DomainError("ROOM_CONFLICT", f"Room {room_number} is already booked in that window", 409) from exc
+        raise DomainError("ROOM_CONFLICT", f"Room {room['room_number']} is already booked in that window", 409) from exc
     sse.publish("rooms", "update", room["id"])
     return q1("SELECT * FROM bookings WHERE booking_id = %s", [bid])
 
@@ -160,11 +177,22 @@ def cancel_booking(booking_id: str, requested_by: str) -> dict:
 def find_free_rooms(date: str, start: str, end: str, min_capacity: int | None = None,
                     equipment: list[str] | None = None) -> list[dict]:
     check_date(date, "date")
-    check_time(start, "start_time")
-    check_time(end, "end_time")
+    start = parse_time(start, "start_time")
+    end = parse_time(end, "end_time")
     check_time_order(start, end)
     free = []
     for room in list_rooms(min_capacity=min_capacity, equipment=equipment):
         if room["status"] == "available" and conflict_reason(room["room_number"], date, start, end) is None:
             free.append({k: room[k] for k in ("room_number", "type", "capacity", "equipment", "floor")})
     return free
+
+
+def list_my_bookings(booked_by: str, include_past: bool = False) -> list[dict]:
+    sql = """SELECT b.booking_id, r.room_number, b.date, b.start_time, b.end_time, b.purpose
+             FROM bookings b JOIN rooms r ON r.id = b.room_id
+             WHERE b.booked_by = %s"""
+    params: list = [booked_by]
+    if not include_past:
+        sql += " AND b.date >= %s"
+        params.append(now_local().date())
+    return q(sql + " ORDER BY b.date, b.start_time", params)

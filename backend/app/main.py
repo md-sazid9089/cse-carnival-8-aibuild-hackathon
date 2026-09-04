@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import sse
-from .config import CLIENT_DIST
+from .agents.gateway import gateway
+from .agents.store import purge_old
+from .config import ALLOWED_ORIGINS, CLIENT_DIST
 from .db import migrate
 from .routers.api import router
 from .search.embedder import warmup_async
@@ -20,23 +22,40 @@ from .services.common import DomainError
 log = logging.getLogger("campusos")
 
 
+async def _housekeeping():
+    """Persist advisory quota counters and drop stale agent state."""
+    while True:
+        await asyncio.sleep(10)
+        try:
+            await asyncio.to_thread(gateway.snapshot)
+            await asyncio.to_thread(purge_old)
+        except Exception as exc:  # noqa: BLE001 - housekeeping must never kill the app
+            log.warning("housekeeping: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     sse.set_loop(asyncio.get_running_loop())
     migrate()
     seeded = seed_if_empty()
     seed_rbac()
-    print(f"[startup] database ready (seeded={seeded})")
+    gateway.restore()
+    print(f"[startup] database ready (seeded={seeded}); agent keys: {len(gateway.keys)}")
     warmup_async()
     reindex_all()  # backfills any rows still missing embeddings (idempotent)
-    yield
+    task = asyncio.create_task(_housekeeping())
+    try:
+        yield
+    finally:
+        task.cancel()
+        await gateway.aclose()
 
 
 app = FastAPI(title="CampusOS", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

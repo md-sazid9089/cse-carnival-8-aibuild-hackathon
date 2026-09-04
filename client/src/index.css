@@ -1,5 +1,260 @@
 @import "tailwindcss";
 
-body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+/* Manual theme switching (system default is resolved in index.html before paint). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens — "Paper & Ink"
+   Bento-grid + Swiss minimalism. Neutral surfaces, one restrained accent,
+   hierarchy carried by weight and space rather than colour.
+--------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --canvas: #f6f6f7;
+  --surface: #ffffff;
+  --surface-2: #fafafb;
+  --surface-3: #f1f1f3;
+  --overlay: rgb(17 17 22 / 0.32);
+
+  --ink: #1a1a1f;
+  --ink-2: #55555e;
+  --ink-3: #8a8a94;
+  --ink-invert: #ffffff;
+
+  --line: rgb(17 17 22 / 0.08);
+  --line-strong: rgb(17 17 22 / 0.16);
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eef3ff;
+  --accent-ink: #1e40af;
+
+  --positive: #047857;
+  --positive-soft: #ecfdf5;
+  --caution: #b45309;
+  --caution-soft: #fffbeb;
+  --critical: #dc2626;
+  --critical-soft: #fef2f2;
+
+  --elev-xs: 0 1px 2px rgb(17 17 22 / 0.05);
+  --elev-sm: 0 1px 2px rgb(17 17 22 / 0.04), 0 2px 6px rgb(17 17 22 / 0.05);
+  --elev-md: 0 2px 4px rgb(17 17 22 / 0.04), 0 8px 20px rgb(17 17 22 / 0.08);
+  --elev-lg: 0 8px 16px rgb(17 17 22 / 0.06), 0 24px 56px rgb(17 17 22 / 0.14);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0b0b0d;
+  --surface: #141417;
+  --surface-2: #1a1a1e;
+  --surface-3: #232329;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --ink: #f3f3f5;
+  --ink-2: #a8a8b2;
+  --ink-3: #71717c;
+  --ink-invert: #0b0b0d;
+
+  --line: rgb(255 255 255 / 0.09);
+  --line-strong: rgb(255 255 255 / 0.18);
+
+  --accent: #6c9bff;
+  --accent-hover: #8bb0ff;
+  --accent-soft: rgb(108 155 255 / 0.14);
+  --accent-ink: #b9cfff;
+
+  --positive: #34d399;
+  --positive-soft: rgb(52 211 153 / 0.14);
+  --caution: #fbbf24;
+  --caution-soft: rgb(251 191 36 / 0.14);
+  --critical: #f87171;
+  --critical-soft: rgb(248 113 113 / 0.14);
+
+  --elev-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3);
+  --elev-md: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 20px rgb(0 0 0 / 0.45);
+  --elev-lg: 0 8px 16px rgb(0 0 0 / 0.35), 0 24px 56px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-overlay: var(--overlay);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-invert: var(--ink-invert);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  --shadow-xs: var(--elev-xs);
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-fade-in: fade-in 0.18s var(--ease-out-soft) both;
+  --animate-rise: rise 0.24s var(--ease-out-soft) both;
+  --animate-pop: pop 0.16s var(--ease-out-soft) both;
+  --animate-sheet: sheet 0.24s var(--ease-out-soft) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px) }
+  to { opacity: 1; transform: none }
+}
+@keyframes pop {
+  from { opacity: 0; transform: translateY(4px) scale(0.985) }
+  to { opacity: 1; transform: none }
+}
+@keyframes sheet {
+  from { opacity: 0; transform: translateY(16px) }
+  to { opacity: 1; transform: none }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0 }
+  to { background-position: -200% 0 }
+}
+
+/* --------------------------------------------------------------------------- */
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+
+  /* One consistent, always-visible focus ring. Never removed without a replacement. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button, [role="button"], summary, select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input, textarea, select, button {
+    font: inherit;
+    color: inherit;
+  }
+  ::placeholder {
+    color: var(--ink-3);
+  }
+
+  /* Native date/time pickers are invisible on dark surfaces without this. */
+  [data-theme="dark"] input::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track { background: transparent }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Numeric columns must not jitter between values. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none }
+}
+
+@utility skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-3) 25%,
+    color-mix(in oklab, var(--surface-3) 60%, var(--surface)) 37%,
+    var(--surface-3) 63%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: var(--radius-md);
+}
+
+/* Translucent chrome — the one "material" flourish, kept subtle. */
+@utility chrome-blur {
+  background-color: color-mix(in oklab, var(--surface) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }

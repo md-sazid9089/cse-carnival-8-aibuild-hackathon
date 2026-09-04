@@ -1,76 +1,236 @@
-import { useEffect, useState } from "react";
-import { setProfile as setApiProfile } from "./api.js";
-import ChatPanel from "./components/ChatPanel.jsx";
+import { useCallback, useEffect, useState } from "react";
+import ChatPanel, { AssistantFab } from "./components/ChatPanel.jsx";
+import CommandPalette from "./components/CommandPalette.jsx";
+import ConfirmHost from "./components/ConfirmDialog.jsx";
 import Toast from "./components/Toast.jsx";
-import { entities } from "./entities.jsx";
+import { IconButton, Kbd, Select } from "./components/ui.jsx";
+import { useMediaQuery, useTheme } from "./hooks.js";
+import { CampusProvider, PROFILES, useCampus } from "./lib/campus.jsx";
+import { cx, initials } from "./lib/format.js";
+import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
+import Announcements from "./pages/Announcements.jsx";
+import Assignments from "./pages/Assignments.jsx";
 import Events from "./pages/Events.jsx";
 import Overview from "./pages/Overview.jsx";
-import ResourcePage from "./pages/ResourcePage.jsx";
 import Rooms from "./pages/Rooms.jsx";
+import Schedules from "./pages/Schedules.jsx";
 
 const NAV = [
-  { id: "overview", label: "Overview", icon: "🏠" },
-  { id: "schedules", label: "Schedules", icon: "📅" },
-  { id: "rooms", label: "Rooms", icon: "🚪" },
-  { id: "events", label: "Events", icon: "🎪" },
-  { id: "announcements", label: "Announcements", icon: "📢" },
-  { id: "assignments", label: "Assignments", icon: "📝" },
+  { id: "overview", label: "Today", icon: Today },
+  { id: "schedules", label: "Schedules", icon: Calendar },
+  { id: "rooms", label: "Rooms", icon: Door },
+  { id: "events", label: "Events", icon: Ticket },
+  { id: "announcements", label: "Announcements", icon: Megaphone },
+  { id: "assignments", label: "Assignments", icon: Clipboard },
 ];
 
-const PROFILES = [
-  { student_id: "20-40532", name: "Sakibul Hassan" },
-  { student_id: "20-40511", name: "Farhan Ahmed" },
-  { student_id: "21-41205", name: "Rafi Hossain" },
-];
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink text-[13px] font-bold text-ink-invert">
+        C
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm leading-tight font-semibold text-ink">CampusOS</span>
+        <span className="block text-[11px] leading-tight text-ink-3">AUST · live campus data</span>
+      </span>
+    </div>
+  );
+}
 
-export default function App() {
+function NavList({ tab, onSelect }) {
+  return (
+    <nav aria-label="Sections" className="flex flex-col gap-0.5">
+      {NAV.map((item) => {
+        const Icon = item.icon;
+        const active = tab === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item.id)}
+            aria-current={active ? "page" : undefined}
+            className={cx(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-150",
+              active ? "bg-surface-3 font-medium text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+            )}
+          >
+            <Icon size={17} className={active ? "text-ink" : "text-ink-3"} />
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function ProfileSwitcher() {
+  const { profile, setProfile } = useCampus();
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 p-2.5">
+      <div className="mb-2 flex items-center gap-2.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-ink">
+          {initials(profile.name)}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
+          <span className="block text-[11px] text-ink-3 tabular">{profile.student_id}</span>
+        </span>
+      </div>
+      <label htmlFor="profile-switcher" className="sr-only">
+        Acting as
+      </label>
+      <Select
+        id="profile-switcher"
+        value={profile.student_id}
+        onChange={(event) => setProfile(PROFILES.find((p) => p.student_id === event.target.value))}
+        className="h-8 text-[13px] normal-case"
+      >
+        {PROFILES.map((p) => (
+          <option key={p.student_id} value={p.student_id}>
+            {p.name}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
+function Shell() {
   const [tab, setTab] = useState("overview");
-  const [profile, setProfile] = useState(PROFILES[0]);
-  const [chatOpen, setChatOpen] = useState(true);
-  useEffect(() => setApiProfile(profile), [profile]);
+  const [navQuery, setNavQuery] = useState("");
+  const [navKey, setNavKey] = useState(0);
+  const [drawer, setDrawer] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const isWide = useMediaQuery("(min-width: 1280px)");
+  const [chatOpen, setChatOpen] = useState(false);
+  const { theme, toggle } = useTheme();
+
+  // The assistant is docked by default on wide screens, on demand everywhere else.
+  useEffect(() => setChatOpen(isWide), [isWide]);
+
+  const navigate = useCallback((next, query = "") => {
+    setTab(next);
+    setNavQuery(query);
+    setNavKey((value) => value + 1);
+    setDrawer(false);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPalette((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const pages = {
+    overview: <Overview onNavigate={navigate} />,
+    schedules: <Schedules initialQuery={navQuery} />,
+    rooms: <Rooms initialQuery={navQuery} />,
+    events: <Events initialQuery={navQuery} />,
+    announcements: <Announcements initialQuery={navQuery} />,
+    assignments: <Assignments initialQuery={navQuery} />,
+  };
 
   return (
-    <div className="flex min-h-screen">
-      <nav className="w-48 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen">
-        <div className="px-4 py-5">
-          <h1 className="text-white font-bold text-lg">CampusOS</h1>
-          <p className="text-xs text-slate-500">AUST · AI Build Hackathon</p>
+    <div className="flex min-h-screen bg-canvas">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-80 focus:rounded-lg focus:bg-ink focus:px-3 focus:py-2 focus:text-[13px] focus:text-ink-invert"
+      >
+        Skip to content
+      </a>
+
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 lg:flex">
+        <div className="px-1.5 pb-4">
+          <Brand />
         </div>
-        {NAV.map((n) => (
-          <button key={n.id} onClick={() => setTab(n.id)}
-                  className={`text-left px-4 py-2.5 text-sm flex gap-2 items-center ${
-                    tab === n.id ? "bg-slate-800 text-white border-l-2 border-indigo-500" : "hover:bg-slate-800/50"}`}>
-            <span>{n.icon}</span> {n.label}
-          </button>
-        ))}
-        <div className="mt-auto p-4">
-          <label className="text-xs text-slate-500 block mb-1">Acting as</label>
-          <select
-            value={profile.student_id}
-            onChange={(e) => setProfile(PROFILES.find((p) => p.student_id === e.target.value))}
-            className="w-full bg-slate-800 text-slate-200 text-sm rounded-lg px-2 py-1.5"
+        <NavList tab={tab} onSelect={navigate} />
+        <div className="mt-auto flex flex-col gap-2 pt-4">
+          <button
+            type="button"
+            onClick={() => setPalette(true)}
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
           >
-            {PROFILES.map((p) => <option key={p.student_id} value={p.student_id}>{p.name}</option>)}
-          </select>
-        </div>
-      </nav>
-
-      <main className="flex-1 min-w-0 p-6 overflow-x-auto">
-        <div className="flex justify-end mb-2 lg:hidden">
-          <button onClick={() => setChatOpen((o) => !o)} className="text-sm text-indigo-600 hover:underline">
-            {chatOpen ? "Hide assistant" : "Show assistant"}
+            <Search size={15} />
+            Search
+            <span className="ml-auto flex gap-1">
+              <Kbd>Ctrl</Kbd>
+              <Kbd>K</Kbd>
+            </span>
           </button>
+          <ProfileSwitcher />
         </div>
-        {tab === "overview" && <Overview />}
-        {tab === "schedules" && <ResourcePage entity="schedules" config={entities.schedules} />}
-        {tab === "rooms" && <Rooms profile={profile} />}
-        {tab === "events" && <Events profile={profile} />}
-        {tab === "announcements" && <ResourcePage entity="announcements" config={entities.announcements} />}
-        {tab === "assignments" && <ResourcePage entity="assignments" config={entities.assignments} />}
-      </main>
+      </aside>
 
-      <ChatPanel profile={profile} open={chatOpen} onToggle={() => setChatOpen((o) => !o)} />
+      {/* Mobile drawer */}
+      {drawer ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-overlay animate-fade-in" onClick={() => setDrawer(false)} aria-hidden="true" />
+          <div className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-line bg-surface px-3 py-4 shadow-lg animate-sheet">
+            <div className="flex items-center justify-between px-1.5 pb-4">
+              <Brand />
+              <IconButton icon={X} label="Close menu" onClick={() => setDrawer(false)} />
+            </div>
+            <NavList tab={tab} onSelect={navigate} />
+            <div className="mt-auto pt-4">
+              <ProfileSwitcher />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="chrome-blur sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line px-3 sm:px-5">
+          <div className="lg:hidden">
+            <IconButton icon={Menu} label="Open menu" onClick={() => setDrawer(true)} />
+          </div>
+          <div className="lg:hidden">
+            <Brand />
+          </div>
+
+          <div className="ml-auto flex items-center gap-1">
+            <div className="lg:hidden">
+              <IconButton icon={Search} label="Search" onClick={() => setPalette(true)} />
+            </div>
+            <IconButton
+              icon={theme === "dark" ? Sun : Moon}
+              label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={toggle}
+            />
+            <div className="hidden xl:block">
+              <IconButton
+                icon={chatOpen ? X : Chat}
+                label={chatOpen ? "Hide assistant" : "Show assistant"}
+                onClick={() => setChatOpen((open) => !open)}
+              />
+            </div>
+          </div>
+        </header>
+
+        <main id="main" className="mx-auto w-full max-w-375 flex-1 px-4 py-5 pb-28 sm:px-6 xl:pb-8">
+          <div key={`${tab}-${navKey}`}>{pages[tab]}</div>
+        </main>
+      </div>
+
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      <AssistantFab onClick={() => setChatOpen(true)} hidden={chatOpen} />
+      <CommandPalette open={palette} onClose={() => setPalette(false)} onNavigate={navigate} />
       <Toast />
+      <ConfirmHost />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <CampusProvider>
+      <Shell />
+    </CampusProvider>
   );
 }

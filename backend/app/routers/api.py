@@ -1,4 +1,7 @@
 """All REST routes. Thin controllers — every rule lives in services."""
+import asyncio
+import json
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -6,21 +9,44 @@ from fastapi import APIRouter, Body, Header, Request
 from fastapi.responses import StreamingResponse
 
 from .. import sse
-from ..agents.orchestrator import handle_chat
+from ..agents.agent import run_turn
+from ..agents.gateway import gateway
 from ..config import TZ_NAME
+from ..db import q1
 from ..search.hybrid import hybrid_search
 from ..services import announcements, assignments, events, rooms, schedules
 from ..services.common import DomainError
 
+log = logging.getLogger("campusos.api")
 router = APIRouter(prefix="/api")
 
 DEFAULT_PROFILE = {"student_id": "20-40532", "name": "Sakibul Hassan"}
+STUDENT_ID_RE = __import__("re").compile(r"^[0-9]{2}-[0-9]{5}$")
 
 
 def _identity(x_student_id: str | None, x_student_name: str | None) -> dict:
     """Acting profile. Single-user app: identity is asserted by the client (profile switcher), not authenticated."""
-    return {"student_id": x_student_id or DEFAULT_PROFILE["student_id"],
-            "name": x_student_name or DEFAULT_PROFILE["name"]}
+    sid = (x_student_id or "").strip()
+    name = (x_student_name or "").strip()[:80]
+    if not STUDENT_ID_RE.match(sid):
+        sid = DEFAULT_PROFILE["student_id"]
+        name = name or DEFAULT_PROFILE["name"]
+    return {"student_id": sid, "name": name or DEFAULT_PROFILE["name"]}
+
+
+def _last_user_message(payload: dict) -> str:
+    """Accept {message} or the legacy {messages:[...]} shape; history itself lives server-side."""
+    message = (payload.get("message") or "").strip()
+    if not message:
+        for m in reversed(payload.get("messages") or []):
+            if m.get("role") == "user" and m.get("content"):
+                message = str(m["content"]).strip()
+                break
+    if not message:
+        raise DomainError("MISSING_FIELDS", "message is required")
+    if len(message) > 2000:
+        raise DomainError("MESSAGE_TOO_LONG", "Please keep messages under 2000 characters")
+    return message
 
 
 @router.get("/meta")
@@ -55,6 +81,14 @@ def schedules_delete(sid: str):
 @router.get("/rooms")
 def rooms_list(type: str | None = None, min_capacity: int | None = None):
     return rooms.list_rooms(type, min_capacity)
+
+
+@router.get("/rooms/free")
+def rooms_free(date: str, start_time: str, end_time: str,
+               min_capacity: int | None = None, equipment: str | None = None):
+    """Availability search — same service the agent's find_free_rooms tool calls."""
+    wanted = [e.strip() for e in equipment.split(",") if e.strip()] if equipment else None
+    return rooms.find_free_rooms(date, start_time, end_time, min_capacity, wanted)
 
 
 @router.post("/rooms")
@@ -176,13 +210,62 @@ def search(q: str):
 
 
 @router.post("/agent/chat")
-def agent_chat(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
-               x_student_name: str | None = Header(default=None)):
-    history = [m for m in payload.get("messages", []) if m.get("role") in ("user", "assistant") and m.get("content")]
-    if not history:
-        raise DomainError("MISSING_FIELDS", "messages must contain at least one user message")
-    profile = payload.get("profile") or _identity(x_student_id, x_student_name)
-    return handle_chat(history[-20:], profile)
+async def agent_chat(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
+                     x_student_name: str | None = Header(default=None)):
+    profile = _identity(x_student_id, x_student_name)
+    message = _last_user_message(payload)
+    return await run_turn(message, profile, payload.get("conversation_id"))
+
+
+@router.post("/agent/chat/stream")
+async def agent_chat_stream(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
+                            x_student_name: str | None = Header(default=None)):
+    profile = _identity(x_student_id, x_student_name)
+    message = _last_user_message(payload)
+    conversation_id = payload.get("conversation_id")
+    queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+
+    async def emit(event: str, data):
+        try:
+            queue.put_nowait((event, data))
+        except asyncio.QueueFull:
+            pass  # slow client: drop progress events, never block the agent
+
+    async def worker():
+        try:
+            result = await run_turn(message, profile, conversation_id, emit=emit)
+            await queue.put(("done", result))
+        except Exception as exc:  # noqa: BLE001 - surface as a clean SSE error
+            log.exception("agent turn failed")
+            await queue.put(("error", {"detail": "The assistant hit an unexpected error.",
+                                       "retryable": True, "error": type(exc).__name__}))
+        finally:
+            await queue.put((None, None))
+
+    async def events():
+        task = asyncio.create_task(worker())
+        try:
+            while True:
+                event, data = await queue.get()
+                if event is None:
+                    break
+                yield f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+        finally:
+            task.cancel()  # client disconnected: stop the upstream call too
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
+                                      "Connection": "keep-alive"})
+
+
+@router.get("/health")
+def health():
+    db_ok = True
+    try:
+        q1("SELECT 1 AS ok")
+    except Exception:  # noqa: BLE001
+        db_ok = False
+    return {"status": "ok" if db_ok else "degraded", "db": db_ok, **gateway.health()}
 
 
 @router.get("/stream")

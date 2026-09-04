@@ -1,91 +1,152 @@
-import { Badge } from "./components/DataTable.jsx";
+import { StatusBadge } from "./components/ui.jsx";
+import { useCampus } from "./lib/campus.jsx";
+import { dueLabel, fmtDate, fmtTimeRange } from "./lib/format.js";
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
-const priorityBadge = { high: "bg-rose-100 text-rose-700", medium: "bg-amber-100 text-amber-700", low: "bg-slate-100 text-slate-600" };
-const statusBadge = {
-  pending: "bg-amber-100 text-amber-700", submitted: "bg-emerald-100 text-emerald-700",
-  graded: "bg-indigo-100 text-indigo-700", late: "bg-rose-100 text-rose-700",
-  upcoming: "bg-indigo-100 text-indigo-700", ongoing: "bg-emerald-100 text-emerald-700",
-  completed: "bg-slate-100 text-slate-600", cancelled: "bg-rose-100 text-rose-700", full: "bg-amber-100 text-amber-700",
-  available: "bg-emerald-100 text-emerald-700", unavailable: "bg-rose-100 text-rose-700",
-};
+export const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
-export const badge = (key) => (row) => <Badge value={row[key]} map={{ ...priorityBadge, ...statusBadge }} />;
+const badge = (key) => (row) => <StatusBadge value={row[key]} />;
 
+/** Config-driven CRUD: one definition per system feeds the table, the form and the filters. */
 export const entities = {
   schedules: {
     title: "Class Schedules",
+    singular: "class",
     endpoint: "/api/schedules",
+    entity: "schedules",
+    blurb: "Every timetabled class — the source the assistant reads for “when is my next class?”.",
+    searchKeys: ["course", "title", "room", "instructor", "section"],
+    filters: [{ key: "day", label: "Day", options: DAYS }],
     columns: [
-      { key: "course", label: "Course" }, { key: "title", label: "Title", wrap: true }, { key: "day", label: "Day" },
-      { key: "start_time", label: "Start" }, { key: "end_time", label: "End" }, { key: "room", label: "Room" },
-      { key: "instructor", label: "Instructor" }, { key: "section", label: "Section" },
+      { key: "course", label: "Course", primary: true, sortable: true },
+      { key: "title", label: "Title", wrap: true },
+      { key: "day", label: "Day", sortable: true },
+      {
+        key: "start_time",
+        label: "Time",
+        sortable: true,
+        render: (r) => fmtTimeRange(r.start_time, r.end_time),
+      },
+      { key: "room", label: "Room", sortable: true },
+      { key: "instructor", label: "Instructor" },
+      { key: "section", label: "Section" },
     ],
     fields: [
-      { key: "course", label: "Course code" }, { key: "title", label: "Course title", wide: true },
+      { key: "course", label: "Course code", placeholder: "CSE 4113" },
+      { key: "section", label: "Section", placeholder: "A" },
+      { key: "title", label: "Course title", wide: true },
       { key: "day", label: "Day", type: "select", options: DAYS },
-      { key: "start_time", label: "Start time", type: "time" }, { key: "end_time", label: "End time", type: "time" },
-      { key: "room", label: "Room" }, { key: "instructor", label: "Instructor" }, { key: "section", label: "Section" },
+      { key: "room", label: "Room", placeholder: "7A01" },
+      { key: "start_time", label: "Start time", type: "time" },
+      { key: "end_time", label: "End time", type: "time" },
+      { key: "instructor", label: "Instructor", wide: true },
     ],
   },
+
   announcements: {
     title: "Announcements",
+    singular: "announcement",
     endpoint: "/api/announcements",
+    entity: "announcements",
+    blurb: "Campus notices. High-priority notices can override the timetable, so the assistant cross-checks them.",
+    searchKeys: ["title", "body", "posted_by"],
+    filters: [{ key: "priority", label: "Priority", options: ["high", "medium", "low"] }],
     columns: [
-      { key: "title", label: "Title", wrap: true },
-      { key: "priority", label: "Priority", render: badge("priority") },
-      { key: "date", label: "Posted" }, { key: "expires", label: "Expires" }, { key: "posted_by", label: "By" },
-    ],
-    fields: [
-      { key: "title", label: "Title", wide: true }, { key: "body", label: "Body", type: "textarea", wide: true },
-      { key: "date", label: "Date", type: "date" }, { key: "expires", label: "Expires", type: "date" },
-      { key: "priority", label: "Priority", type: "select", options: ["high", "medium", "low"] },
+      { key: "title", label: "Title", primary: true, wrap: true, sortable: true },
+      { key: "priority", label: "Priority", sortable: true, render: badge("priority") },
+      { key: "date", label: "Posted", sortable: true, render: (r) => fmtDate(r.date) },
+      { key: "expires", label: "Expires", sortable: true, render: (r) => fmtDate(r.expires) },
       { key: "posted_by", label: "Posted by" },
     ],
+    fields: [
+      { key: "title", label: "Title", wide: true },
+      { key: "body", label: "Body", type: "textarea", rows: 4, wide: true },
+      { key: "priority", label: "Priority", type: "select", options: ["high", "medium", "low"], default: "medium" },
+      { key: "posted_by", label: "Posted by", placeholder: "Dept. of CSE" },
+      { key: "date", label: "Posted on", type: "date" },
+      { key: "expires", label: "Expires", type: "date" },
+    ],
   },
+
   assignments: {
     title: "Assignments",
+    singular: "assignment",
     endpoint: "/api/assignments",
+    entity: "assignments",
+    blurb: "Deadlines across every course — what “what’s due this week?” resolves against.",
+    searchKeys: ["title", "course", "course_title", "description", "submission_platform"],
+    filters: [{ key: "status", label: "Status", options: ["pending", "submitted", "graded", "late"] }],
     columns: [
-      { key: "course", label: "Course" }, { key: "title", label: "Title", wrap: true },
-      { key: "deadline", label: "Deadline" },
-      { key: "status", label: "Status", render: badge("status") },
-      { key: "submission_platform", label: "Submit via" }, { key: "marks", label: "Marks" },
+      { key: "title", label: "Assignment", primary: true, wrap: true, sortable: true },
+      { key: "course", label: "Course", sortable: true },
+      {
+        key: "deadline",
+        label: "Deadline",
+        sortable: true,
+        render: (r) => (
+          <span className="inline-flex items-center gap-2">
+            {fmtDate(r.deadline)}
+            <DeadlineHint deadline={r.deadline} status={r.status} />
+          </span>
+        ),
+      },
+      { key: "status", label: "Status", sortable: true, render: badge("status") },
+      { key: "submission_platform", label: "Submit via" },
+      { key: "marks", label: "Marks", align: "right", sortable: true },
     ],
     fields: [
-      { key: "course", label: "Course code" }, { key: "course_title", label: "Course title" },
+      { key: "course", label: "Course code", placeholder: "CSE 4113" },
+      { key: "course_title", label: "Course title" },
       { key: "title", label: "Assignment title", wide: true },
       { key: "description", label: "Description", type: "textarea", wide: true },
-      { key: "assigned_date", label: "Assigned", type: "date" }, { key: "deadline", label: "Deadline", type: "date" },
-      { key: "submission_platform", label: "Submission platform" },
-      { key: "status", label: "Status", type: "select", options: ["pending", "submitted", "graded", "late"] },
-      { key: "marks", label: "Marks", type: "number" },
+      { key: "assigned_date", label: "Assigned on", type: "date" },
+      { key: "deadline", label: "Deadline", type: "date" },
+      { key: "submission_platform", label: "Submission platform", placeholder: "Google Classroom" },
+      { key: "status", label: "Status", type: "select", options: ["pending", "submitted", "graded", "late"], default: "pending" },
+      { key: "marks", label: "Marks", type: "number", min: 0 },
     ],
   },
 };
+
+function DeadlineHint({ deadline, status }) {
+  const { today } = useCampus();
+  if (status !== "pending") return null;
+  const { text, tone } = dueLabel(deadline, today);
+  if (tone === "neutral") return null;
+  const color = tone === "critical" ? "text-critical" : "text-caution";
+  return <span className={`text-xs font-medium ${color}`}>{text}</span>;
+}
 
 export const roomFields = [
   { key: "room_number", label: "Room number", placeholder: "7A08" },
   { key: "type", label: "Type", type: "select", options: ["classroom", "lab", "seminar"] },
-  { key: "capacity", label: "Capacity", type: "number" },
-  { key: "floor", label: "Floor", type: "number" },
-  { key: "equipment", label: "Equipment (comma-separated)", type: "tags", wide: true },
+  { key: "capacity", label: "Capacity", type: "number", min: 1 },
+  { key: "floor", label: "Floor", type: "number", min: 0 },
+  { key: "equipment", label: "Equipment", type: "tags", wide: true, hint: "Comma separated — e.g. projector, whiteboard, ac" },
   { key: "status", label: "Status", type: "select", options: ["available", "unavailable"], default: "available" },
 ];
 
 export const eventFields = [
   { key: "name", label: "Event name", wide: true },
   { key: "description", label: "Description", type: "textarea", wide: true },
-  { key: "date", label: "Date", type: "date" }, { key: "end_date", label: "End date (optional)", type: "date", optional: true },
-  { key: "start_time", label: "Start", type: "time" }, { key: "end_time", label: "End", type: "time" },
-  { key: "venue", label: "Venue (room)" }, { key: "organizer", label: "Organizer" },
-  { key: "capacity", label: "Capacity", type: "number" },
-  { key: "status", label: "Status", type: "select", options: ["upcoming", "ongoing", "completed", "cancelled", "full"], default: "upcoming" },
+  { key: "date", label: "Date", type: "date" },
+  { key: "end_date", label: "End date", type: "date", optional: true, hint: "Only for multi-day events" },
+  { key: "start_time", label: "Start", type: "time" },
+  { key: "end_time", label: "End", type: "time" },
+  { key: "venue", label: "Venue", placeholder: "7C01" },
+  { key: "organizer", label: "Organizer" },
+  { key: "capacity", label: "Capacity", type: "number", min: 1 },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: ["upcoming", "ongoing", "completed", "cancelled", "full"],
+    default: "upcoming",
+  },
 ];
 
 export const bookingFields = [
   { key: "date", label: "Date", type: "date" },
-  { key: "purpose", label: "Purpose" },
+  { key: "purpose", label: "Purpose", placeholder: "Project meeting" },
   { key: "start_time", label: "Start", type: "time" },
   { key: "end_time", label: "End", type: "time" },
 ];

@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 from .. import sse
 from ..db import execute, next_id, q, q1
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, require, to_int
+from .common import DomainError, check_date, check_enum, require, today_local, to_int
 
 FIELDS = ["course", "course_title", "title", "description", "assigned_date", "deadline",
           "submission_platform", "status", "marks"]
@@ -13,7 +15,9 @@ def list_assignments(status: str | None = None, due_within_days: int | None = No
     if status:
         conds.append("status = %s"); params.append(status)
     if due_within_days is not None:
-        conds.append("deadline BETWEEN CURRENT_DATE AND CURRENT_DATE + %s::int"); params.append(int(due_within_days))
+        today = today_local()
+        conds.append("deadline BETWEEN %s AND %s")
+        params.extend([today, today + timedelta(days=int(due_within_days))])
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY deadline", params)
