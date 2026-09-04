@@ -55,9 +55,9 @@ function StatTile({ icon: Icon, label, value, onClick }) {
 }
 
 export default function Overview({ onNavigate }) {
-  const { today, weekday, nowTime, profile, isTeacher, timezone } = useCampus();
+  const { today, weekday, nowTime, profile, timezone } = useCampus();
 
-  const schedules = useApi(isTeacher ? `/api/schedules?instructor=${encodeURIComponent(profile.name)}` : "/api/schedules");
+  const schedules = useApi("/api/schedules");
   const events = useApi("/api/events");
   const announcements = useApi("/api/announcements?include_expired=false");
   const assignments = useApi("/api/assignments");

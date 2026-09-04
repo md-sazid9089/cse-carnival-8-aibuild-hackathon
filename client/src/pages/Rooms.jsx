@@ -119,8 +119,8 @@ function FreeRoomFinder({ today, onBook, invalidateKey }) {
 
       {open ? (
         <div className="border-t border-line px-4 py-4">
-          <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <Field label="Date" htmlFor="finder-date" required className="lg:col-span-2">
+          <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Date" htmlFor="finder-date" required className="sm:col-span-2">
               <TextInput id="finder-date" type="date" value={form.date} onChange={(e) => set("date", e.target.value)} />
             </Field>
             <Field label="From" htmlFor="finder-start" required>
@@ -148,7 +148,7 @@ function FreeRoomFinder({ today, onBook, invalidateKey }) {
                 onChange={(e) => set("equipment", e.target.value)}
               />
             </Field>
-            <div className="sm:col-span-2 lg:col-span-6">
+            <div className="sm:col-span-2 lg:col-span-4">
               <Button type="submit" variant="primary" loading={busy} icon={Search}>
                 Search availability
               </Button>

@@ -122,7 +122,6 @@ export const api = {
   signin: (credentials) => request("POST", "/api/auth/signin", credentials),
   signup: (userData) => request("POST", "/api/auth/signup", userData),
   getMe: () => request("GET", "/api/auth/me"),
-  getUsers: () => request("GET", "/api/auth/users"),
 };
 
 export function toast(message, kind = "info") {

@@ -138,11 +138,10 @@ function Timetable({ rows, loading, today, nowTime, onEdit, onDelete, onAdd }) {
 
 export default function Schedules({ initialQuery = "" }) {
   const { data, error, staleError, loading, refreshing, refresh } = useApi(config.endpoint);
-  const { today, weekday, nowTime, profile, isTeacher } = useCampus();
+  const { today, weekday, nowTime } = useCampus();
   const [view, setView] = useState(initialQuery ? "table" : "timetable");
   const [query, setQuery] = useState(initialQuery);
   const [day, setDay] = useState("");
-  const [mine, setMine] = useState(isTeacher);
   const search = useDebounced(query);
 
   useSSE(config.entity, refresh);
@@ -158,12 +157,11 @@ export default function Schedules({ initialQuery = "" }) {
     const rows = data ?? [];
     const needle = search.trim().toLowerCase();
     return rows.filter((row) => {
-      if (mine && isTeacher && row.instructor !== profile.name) return false;
       if (day && row.day !== day) return false;
       if (!needle) return true;
       return config.searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(needle));
     });
-  }, [data, day, search, mine, isTeacher, profile.name]);
+  }, [data, day, search]);
 
   const { sorted, sort, toggle } = useSort(filtered, { key: "day", direction: "asc" }, config.columns);
 
@@ -198,17 +196,6 @@ export default function Schedules({ initialQuery = "" }) {
         >
           <SearchInput value={query} onChange={setQuery} placeholder="Search course, room, instructor" id="search-schedules" />
           <FilterSelect label="Day" allLabel="Any day" options={DAYS} value={day} onChange={setDay} />
-          {isTeacher ? (
-            <Segmented
-              label="Scope"
-              value={mine ? "mine" : "all"}
-              onChange={(value) => setMine(value === "mine")}
-              options={[
-                { value: "mine", label: "My classes" },
-                { value: "all", label: "All classes" },
-              ]}
-            />
-          ) : null}
         </Toolbar>
       </PageHeader>
 

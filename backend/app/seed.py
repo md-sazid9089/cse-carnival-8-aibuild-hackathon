@@ -66,7 +66,10 @@ def link_identities() -> None:
 
 
 def seed_rbac() -> bool:
-    """Seed permissions and student seed users idempotently."""
+    """Seed the permission catalogue and the demo student accounts idempotently.
+
+    Migration 004 dropped `roles`/`role_permissions`: every account is a student.
+    """
     permissions = [
         # schedules
         ("schedules:view", "View Schedules", "schedules", "View class routines and timetables"),

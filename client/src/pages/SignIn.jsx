@@ -3,28 +3,16 @@ import { api, setAuth, toast } from "../api.js";
 
 const DEMO_ACCOUNTS = [
   {
-    role: "Authority",
-    label: "👑 Campus Admin (Authority · Full Access)",
-    email: "admin@aust.edu",
-    password: "admin@aust2026",
-    badgeCls: "bg-purple-100 text-purple-800 border-purple-200",
-    desc: "Unrestricted full access across the entire campus platform",
-  },
-  {
-    role: "Student",
-    label: "🎓 Sakibul Hassan (Student · Initial Role)",
+    label: "🎓 Sakibul Hassan",
     email: "sakibul.hassan@aust.edu",
     password: "student123",
-    badgeCls: "bg-blue-100 text-blue-800 border-blue-200",
-    desc: "Standard student role with routine, booking & event features",
+    desc: "Seed profile with existing bookings and event registrations",
   },
   {
-    role: "Teacher",
-    label: "👨‍🏫 Prof. Dr. Shahriar (Teacher)",
-    email: "shahriar.mahbub@aust.edu",
-    password: "teacher123",
-    badgeCls: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    desc: "Academic faculty member with scheduling & grading rights",
+    label: "🎓 Tanvir Ahmed",
+    email: "tanvir.ahmed@aust.edu",
+    password: "student123",
+    desc: "Second student — useful for testing ownership rules",
   },
 ];
 
@@ -47,7 +35,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
     try {
       const res = await api.signin({ email_or_id: ident.trim(), password });
       setAuth(res.user, res.token);
-      toast(`Welcome back, ${res.user.name}! (Role: ${res.user.role_id.toUpperCase()})`, "success");
+      toast(`Welcome back, ${res.user.name}!`, "success");
       if (onSuccess) onSuccess(res.user);
       else if (onNavigate) onNavigate("overview");
     } catch (err) {
@@ -102,13 +90,13 @@ export default function SignIn({ onNavigate, onSuccess }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Email or Student / Employee ID
+                Email or Student ID
               </label>
               <input
                 type="text"
                 value={ident}
                 onChange={(e) => setIdent(e.target.value)}
-                placeholder="e.g. sakibul.hassan@aust.edu or admin@aust.edu"
+                placeholder="e.g. sakibul.hassan@aust.edu or 20-40532"
                 required
                 className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
@@ -164,9 +152,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-200 group-hover:text-white">{acc.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${acc.badgeCls}`}>
-                      {acc.role}
-                    </span>
+                    <span className="text-[10px] text-slate-400">{acc.desc}</span>
                   </div>
                   <span className="text-[11px] text-slate-400">{acc.email} · {acc.password}</span>
                 </button>
