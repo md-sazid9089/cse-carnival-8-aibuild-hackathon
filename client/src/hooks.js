@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api.js";
+import { API_BASE, api } from "./api.js";
 
 /**
  * Live read of an API path. There is no cache anywhere: every mount and every
@@ -58,7 +58,7 @@ const listeners = new Set();
 
 function ensureStream() {
   if (source) return;
-  source = new EventSource("/api/stream");
+  source = new EventSource(API_BASE + "/api/stream");
   source.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);

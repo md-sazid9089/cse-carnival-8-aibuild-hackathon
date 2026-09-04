@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useId } from "react";
 import { cx } from "../lib/format.js";
 import { Spinner } from "../lib/icons.jsx";
 
@@ -8,9 +8,9 @@ const VARIANTS = {
   primary: "bg-ink text-ink-invert hover:bg-ink/88 shadow-xs",
   secondary: "bg-surface text-ink border border-line hover:bg-surface-2 shadow-xs",
   ghost: "text-ink-2 hover:bg-surface-3 hover:text-ink",
-  accent: "bg-accent text-white hover:bg-accent-hover shadow-xs",
+  accent: "bg-accent text-ink-invert hover:bg-accent-hover shadow-xs",
   danger: "text-critical hover:bg-critical-soft",
-  dangerSolid: "bg-critical text-white hover:opacity-90 shadow-xs",
+  dangerSolid: "bg-critical text-ink-invert hover:opacity-90 shadow-xs",
 };
 
 const SIZES = {
@@ -38,6 +38,7 @@ export const Button = forwardRef(function Button(
       ref={ref}
       type={type}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cx(
         "inline-flex items-center justify-center font-medium whitespace-nowrap select-none",
         "transition-[background-color,color,box-shadow,transform] duration-150 ease-out-soft",
@@ -162,21 +163,39 @@ export const StatusBadge = ({ value, dot = false }) =>
 /* ------------------------------------------------------------- form parts */
 
 const CONTROL =
-  "w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink transition-colors duration-150 " +
-  "hover:border-line-strong disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full rounded-lg border border-line-control bg-surface px-3 text-sm text-ink transition-colors duration-150 " +
+  "hover:border-ink-3 disabled:opacity-50 disabled:cursor-not-allowed";
 
+/**
+ * Label + control + message. The message is linked to the control with
+ * aria-describedby so screen readers hear *why* a field is invalid.
+ */
 export function Field({ label, hint, error, required = false, htmlFor, className = "", children }) {
+  const messageId = useId();
   return (
     <div className={cx("min-w-0", className)}>
       <label htmlFor={htmlFor} className="mb-1.5 block text-[13px] font-medium text-ink-2">
         {label}
-        {required ? <span className="ml-0.5 text-critical">*</span> : null}
+        {required ? (
+          <>
+            <span aria-hidden="true" className="ml-0.5 text-critical">
+              *
+            </span>
+            <span className="sr-only"> (required)</span>
+          </>
+        ) : (
+          <span className="ml-1 text-ink-3">(optional)</span>
+        )}
       </label>
-      {children}
+      {typeof children === "function" ? children({ describedBy: error || hint ? messageId : undefined }) : children}
       {error ? (
-        <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-critical">{error}</p>
+        <p id={messageId} role="alert" className="mt-1.5 text-xs font-medium text-critical">
+          {error}
+        </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-ink-3">{hint}</p>
+        <p id={messageId} className="mt-1.5 text-xs text-ink-3">
+          {hint}
+        </p>
       ) : null}
     </div>
   );
@@ -244,7 +263,7 @@ export function Segmented({ options, value, onChange, label }) {
             )}
           >
             {opt.icon ? <opt.icon size={14} /> : null}
-            <span className={opt.iconOnly ? "sr-only" : undefined}>{opt.label}</span>
+            <span className={opt.iconOnly ? "sr-only sm:not-sr-only" : undefined}>{opt.label}</span>
           </button>
         );
       })}

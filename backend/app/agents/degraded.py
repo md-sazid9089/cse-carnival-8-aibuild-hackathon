@@ -14,8 +14,11 @@ OFFLINE_MSG = ("The AI is temporarily unavailable, so I can't take actions right
 
 # Anchored, non-backtracking patterns; write verbs and negations are excluded before matching.
 WRITE_VERBS = re.compile(r"\b(book|booking|reserve|register|registration|enrol|enroll|sign\s?up|cancel|"
-                         r"unbook|delete|remove|edit|change|confirm)\b", re.I)
-NEGATION = re.compile(r"\b(don'?t|do not|never|without|not\b)", re.I)
+                         r"unbook|delete|remove|edit|change|confirm|claim)\b", re.I)
+# read words that become write requests in front of a resource noun ("schedule a room" vs "my schedule")
+WRITE_PHRASES = re.compile(r"\b(schedule|get|grab|take|need|want)\s+(me\s+)?(a|an|the)?\s*"
+                           r"(room|lab|seminar|slot|spot|seat|place)\b", re.I)
+NEGATION = re.compile(r"\b(don'?t|do not|never|without|not)\b", re.I)
 
 INTENTS = [
     ("next_class", re.compile(r"\bnext\s+(class|lecture)\b|\bwhen\s+is\s+my\s+(next\s+)?class\b", re.I)),
@@ -36,7 +39,7 @@ def answer(message: str, profile: dict) -> dict | None:
     text = (message or "").strip()
     if not text:
         return None
-    if WRITE_VERBS.search(text) or NEGATION.search(text):
+    if WRITE_VERBS.search(text) or WRITE_PHRASES.search(text) or NEGATION.search(text):
         return {"reply": OFFLINE_MSG, "degraded": True, "tool_calls": []}
 
     intent = next((name for name, rx in INTENTS if rx.search(text)), None)

@@ -19,11 +19,13 @@
 
   --ink: #1a1a1f;
   --ink-2: #55555e;
-  --ink-3: #8a8a94;
+  --ink-3: #6b6b75;
   --ink-invert: #ffffff;
 
   --line: rgb(17 17 22 / 0.08);
   --line-strong: rgb(17 17 22 / 0.16);
+  /* Boundary of an interactive control — must clear 3:1 (WCAG 1.4.11). */
+  --line-control: rgb(17 17 22 / 0.46);
 
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
@@ -34,7 +36,7 @@
   --positive-soft: #ecfdf5;
   --caution: #b45309;
   --caution-soft: #fffbeb;
-  --critical: #dc2626;
+  --critical: #b91c1c;
   --critical-soft: #fef2f2;
 
   --elev-xs: 0 1px 2px rgb(17 17 22 / 0.05);
@@ -54,11 +56,12 @@
 
   --ink: #f3f3f5;
   --ink-2: #a8a8b2;
-  --ink-3: #71717c;
+  --ink-3: #8a8a94;
   --ink-invert: #0b0b0d;
 
   --line: rgb(255 255 255 / 0.09);
   --line-strong: rgb(255 255 255 / 0.18);
+  --line-control: rgb(255 255 255 / 0.34);
 
   --accent: #6c9bff;
   --accent-hover: #8bb0ff;
@@ -95,6 +98,7 @@
 
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-line-control: var(--line-control);
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
@@ -209,16 +213,22 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
+    scrollbar-color: var(--line-control) transparent;
   }
   ::-webkit-scrollbar { width: 10px; height: 10px }
   ::-webkit-scrollbar-thumb {
-    background: var(--line-strong);
+    background: var(--line-control);
     border: 3px solid transparent;
     background-clip: content-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-track { background: transparent }
+
+  /* Sticky app chrome must never cover the element that just took focus. */
+  main :focus-visible {
+    scroll-margin-top: 4.5rem;
+    scroll-margin-bottom: 2rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -227,6 +237,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* A frozen spinner is not "reduced motion", it is a broken progress indicator. */
+  .animate-spin {
+    animation: spin 1.8s linear infinite !important;
   }
 }
 

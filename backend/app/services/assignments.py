@@ -4,6 +4,7 @@ from .. import sse
 from ..db import execute, next_id, q, q1
 from ..search.indexer import reindex, unindex
 from .common import DomainError, check_date, check_enum, require, today_local, to_int
+from .courses import ensure_course
 
 FIELDS = ["course", "course_title", "title", "description", "assigned_date", "deadline",
           "submission_platform", "status", "marks"]
@@ -43,6 +44,7 @@ def create_assignment(data: dict) -> dict:
     data.setdefault("status", "pending")
     require(data, FIELDS)
     _validate(data)
+    ensure_course(data["course"], data["course_title"])
     aid = next_id("assignments", "asgn")
     execute("INSERT INTO assignments VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             [aid] + [data[f] for f in FIELDS])
@@ -55,6 +57,7 @@ def create_assignment(data: dict) -> dict:
 def update_assignment(aid: str, data: dict) -> dict:
     merged = {**get_assignment(aid), **{k: v for k, v in data.items() if k in FIELDS}}
     _validate(merged)
+    ensure_course(merged["course"], merged["course_title"])
     execute(
         """UPDATE assignments SET course=%s,course_title=%s,title=%s,description=%s,assigned_date=%s,
            deadline=%s,submission_platform=%s,status=%s,marks=%s WHERE id=%s""",

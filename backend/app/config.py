@@ -42,16 +42,10 @@ AGENT_HISTORY_TURNS = _int("AGENT_HISTORY_TURNS", 12)
 AGENT_DAILY_CAP = _int("AGENT_DAILY_CAP", 800)
 AGENT_DEGRADED_MODE = os.getenv("AGENT_DEGRADED_MODE", "1") == "1"
 
-# TEMPORARY: legacy single-value names still imported by agents/openrouter.py and
-# agents/orchestrator.py. Delete once the gateway replaces those two modules.
-OPENROUTER_API_KEY = OPENROUTER_API_KEYS[0] if OPENROUTER_API_KEYS else ""
-OPENROUTER_MODEL = OPENROUTER_MODELS[0]
-OPENROUTER_ROUTER_MODEL = OPENROUTER_MODELS[-1]
-FALLBACK_SINGLE_AGENT = os.getenv("FALLBACK_SINGLE_AGENT", "0") == "1"
-
 EMBEDDINGS_ENABLED = os.getenv("EMBEDDINGS_ENABLED", "1") == "1"
 TZ_NAME = os.getenv("TZ_NAME", "Asia/Dhaka")
-ALLOWED_ORIGINS = _csv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+# Local dev origins plus any extra origin for a separately hosted frontend.
+ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"] + _csv("ALLOWED_ORIGINS")
 APP_URL = os.getenv("APP_URL", "http://localhost:8000")
 
 DATA_DIR = ROOT / "data"

@@ -10,6 +10,61 @@ def _load(name: str):
     return json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
 
 
+def _courses_from(schedules: list[dict], assignments: list[dict]) -> list[tuple]:
+    titles: dict[str, str] = {}
+    for s in schedules:
+        titles.setdefault(s["course"], s["title"])
+    for a in assignments:
+        titles.setdefault(a["course"], a["course_title"])
+    return [
+        (code, title, code.split(" ")[0], "lab" if title.lower().endswith("lab") else "theory")
+        for code, title in titles.items()
+    ]
+
+
+def link_identities() -> None:
+    """Attach seeded records to user accounts and build course enrollments.
+
+    Runs on every boot and is a no-op once everything resolves. Rows whose author
+    has no account simply stay unlinked - the free-text name remains the display value.
+    """
+    with pool.connection() as conn:
+        conn.execute(
+            """INSERT INTO course_enrollments (user_id, course_code, section, role_in_course)
+               SELECT DISTINCT ON (u.id, s.course) u.id, s.course, s.section, 'instructor'
+               FROM schedules s JOIN users u ON u.name = s.instructor
+               ON CONFLICT DO NOTHING"""
+        )
+        conn.execute(
+            """INSERT INTO course_enrollments (user_id, course_code, section, role_in_course)
+               SELECT u.id, c.code,
+                      COALESCE((SELECT s.section FROM schedules s WHERE s.course = c.code LIMIT 1), 'B'),
+                      'student'
+               FROM users u CROSS JOIN courses c
+               WHERE u.role_id = 'student'
+               ON CONFLICT DO NOTHING"""
+        )
+        conn.execute(
+            """UPDATE registrations r SET user_id = u.id
+               FROM users u WHERE u.student_id = r.student_id AND r.user_id IS NULL"""
+        )
+        conn.execute(
+            """UPDATE bookings b SET user_id = (
+                   SELECT u.id FROM users u
+                   WHERE u.name = b.booked_by OR u.name LIKE '%' || b.booked_by
+                   ORDER BY length(u.name) LIMIT 1)
+               WHERE b.user_id IS NULL"""
+        )
+        conn.execute(
+            """UPDATE announcements a SET created_by = u.id
+               FROM users u WHERE u.name = a.posted_by AND a.created_by IS NULL"""
+        )
+        conn.execute(
+            """UPDATE events e SET created_by = u.id
+               FROM users u WHERE u.name = e.organizer AND e.created_by IS NULL"""
+        )
+
+
 def seed_rbac() -> bool:
     """Seed roles, permissions, role-permission matrix, and seed users idempotently."""
     roles = [
@@ -42,6 +97,9 @@ def seed_rbac() -> bool:
         ("assignments:submit", "Submit Assignment", "assignments", "Submit solutions or assignments before deadlines"),
         ("assignments:manage", "Manage Assignments", "assignments", "Create, update, or delete assignments and set marks"),
         ("assignments:grade", "Grade Assignments", "assignments", "Review and grade student submissions"),
+        # courses
+        ("courses:view", "View Courses", "courses", "Browse the course catalogue and enrollments"),
+        ("courses:manage", "Manage Courses", "courses", "Create or edit courses and manage enrollments"),
         # system
         ("users:manage", "Manage Users", "system", "Manage user profiles and roles"),
         ("logs:view", "View Activity Logs", "system", "Inspect system audit logs and activity trail"),
@@ -55,6 +113,7 @@ def seed_rbac() -> bool:
             "events:view", "events:register", "events:cancel_own",
             "announcements:view",
             "assignments:view", "assignments:submit",
+            "courses:view",
         ],
         "teacher": [
             "schedules:view", "schedules:manage",
@@ -62,10 +121,12 @@ def seed_rbac() -> bool:
             "events:view", "events:register", "events:cancel_own", "events:manage",
             "announcements:view", "announcements:create", "announcements:manage",
             "assignments:view", "assignments:manage", "assignments:grade",
+            "courses:view", "courses:manage",
         ],
         "authority": [p[0] for p in permissions],  # All permissions
     }
 
+    # Every person named in data/*.json gets an account so the linkage columns resolve.
     users = [
         # (id, role_id, student_id, employee_id, name, email, department, status)
         ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active"),
@@ -75,6 +136,18 @@ def seed_rbac() -> bool:
         ("usr-005", "teacher", None, "FAC-0102", "Prof. Dr. Md. Shamim Akhter", "shamim.akhter@aust.edu", "CSE", "active"),
         ("usr-006", "authority", None, "AUTH-0001", "AUST Administration", "admin@aust.edu", "CSE", "active"),
         ("usr-007", "authority", None, "AUTH-0002", "Head of Department", "head.cse@aust.edu", "CSE", "active"),
+        ("usr-008", "student", "20-40511", None, "Farhan Ahmed", "farhan.ahmed@aust.edu", "CSE", "active"),
+        ("usr-009", "student", "20-40498", None, "Tasnia Islam", "tasnia.islam@aust.edu", "CSE", "active"),
+        ("usr-010", "student", "21-41205", None, "Rafi Hossain", "rafi.hossain@aust.edu", "CSE", "active"),
+        ("usr-011", "teacher", None, "FAC-0103", "Prof. Dr. Faisal Muhammad Shah", "faisal.shah@aust.edu", "CSE", "active"),
+        ("usr-012", "teacher", None, "FAC-0104", "Ms. Nusrat Jahan", "nusrat.jahan@aust.edu", "CSE", "active"),
+        ("usr-013", "teacher", None, "FAC-0105", "Mr. Raihan Tanvir", "raihan.tanvir@aust.edu", "CSE", "active"),
+        ("usr-014", "teacher", None, "FAC-0106", "Mr. Saha Reno", "saha.reno@aust.edu", "CSE", "active"),
+        ("usr-015", "teacher", None, "FAC-0107", "Ms. Nawrin Tabassum", "nawrin.tabassum@aust.edu", "CSE", "active"),
+        ("usr-016", "authority", None, "AUTH-0003", "Library Authority", "library@aust.edu", "CSE", "active"),
+        ("usr-017", "authority", None, "AUTH-0004", "Maintenance Department", "maintenance@aust.edu", "CSE", "active"),
+        ("usr-018", "authority", None, "AUTH-0005", "AUSTPIC", "austpic@aust.edu", "CSE", "active"),
+        ("usr-019", "authority", None, "AUTH-0006", "CSE Department", "dept.cse@aust.edu", "CSE", "active"),
     ]
 
     with pool.connection() as conn:
@@ -117,6 +190,7 @@ def seed_rbac() -> bool:
                        status = EXCLUDED.status""",
                 [u_id, role_id, student_id, employee_id, name, email, dept, status],
             )
+    link_identities()
     return True
 
 
@@ -133,6 +207,11 @@ def seed_if_empty() -> bool:
     assignments = _load("assignments.json")
 
     with pool.connection() as conn:
+        for code, title, dept, kind in _courses_from(schedules, assignments):
+            conn.execute(
+                "INSERT INTO courses (code, title, department, kind) VALUES (%s,%s,%s,%s) ON CONFLICT (code) DO NOTHING",
+                [code, title, dept, kind],
+            )
         for s in schedules:
             conn.execute(
                 "INSERT INTO schedules VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",

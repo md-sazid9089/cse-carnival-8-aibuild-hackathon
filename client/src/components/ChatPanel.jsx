@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api } from "../api.js";
+import { API_BASE } from "../api.js";
 import { useMediaQuery } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { cx } from "../lib/format.js";
@@ -93,18 +93,58 @@ function ToolTrace({ calls }) {
       {calls.map((call, index) => (
         <li key={index}>
           <span
-            title={Object.keys(call.args ?? {}).length ? JSON.stringify(call.args) : undefined}
+            title={call.summary ?? (Object.keys(call.args ?? {}).length ? JSON.stringify(call.args) : undefined)}
             className={cx(
               "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
-              call.ok ? "border-positive/30 bg-positive-soft text-positive" : "border-critical/30 bg-critical-soft text-critical",
+              call.pending
+                ? "border-line bg-surface-3 text-ink-3"
+                : call.ok
+                  ? "border-positive/30 bg-positive-soft text-positive"
+                  : "border-critical/30 bg-critical-soft text-critical",
             )}
           >
-            {call.ok ? <Check size={11} /> : <X size={11} />}
-            {TOOL_LABELS[call.tool] ?? call.tool}
+            {call.pending ? <Spinner size={11} /> : call.ok ? <Check size={11} /> : <X size={11} />}
+            {call.label ?? TOOL_LABELS[call.tool] ?? call.tool}
           </span>
         </li>
       ))}
     </ul>
+  );
+}
+
+function ConfirmCard({ proposal, busy, onChoose }) {
+  const [left, setLeft] = useState(proposal.expires_in_seconds ?? 600);
+  useEffect(() => {
+    const timer = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [proposal.action_id]);
+  const mins = Math.floor(left / 60);
+  const secs = String(left % 60).padStart(2, "0");
+  return (
+    <div className="mt-1.5 max-w-[92%] rounded-xl border border-line bg-surface-2 p-3">
+      <p className="text-[13px] leading-snug text-ink">{proposal.summary}</p>
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={busy || left === 0}
+          onClick={() => onChoose(`confirm ${proposal.action_id}`)}
+        >
+          Yes, do it
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => onChoose(`cancel ${proposal.action_id}`)}
+        >
+          No
+        </Button>
+        <span className="text-[11px] text-ink-3">
+          {left === 0 ? "expired" : `expires in ${mins}m ${secs}s`}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -168,12 +208,21 @@ export default function ChatPanel({ open, onClose }) {
   const { profile } = useCampus();
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const conversationRef = useRef(null);
+  const abortRef = useRef(null);
   const scrollRef = useRef(null);
   const isWide = useMediaQuery("(min-width: 1280px)");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
+
+  // A different student is a different conversation: never mix two people's context.
+  useEffect(() => {
+    conversationRef.current = null;
+    setMessages([]);
+  }, [profile.student_id]);
 
   useEffect(() => {
     if (isWide || !open) return undefined;
@@ -182,20 +231,90 @@ export default function ChatPanel({ open, onClose }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [isWide, open, onClose]);
 
+  const reset = () => {
+    abortRef.current?.abort();
+    conversationRef.current = null;
+    setMessages([]);
+  };
+
   const send = async (content) => {
+    if (busy || !content?.trim()) return;
     const history = [...messages, { role: "user", content }];
     setMessages(history);
     setBusy(true);
+    setStatus("Thinking\u2026");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let streamed = "";
+    let calls = [];
+    const paint = (extra = {}) =>
+      setMessages([...history, { role: "assistant", content: streamed, tool_calls: calls, ...extra }]);
+
     try {
-      const res = await api.post("/api/agent/chat", {
-        messages: history.map(({ role, content: text }) => ({ role, content: text })),
-        profile,
+      const res = await fetch(API_BASE + "/api/agent/chat/stream", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Student-Id": profile.student_id,
+          "X-Student-Name": profile.name,
+        },
+        body: JSON.stringify({ message: content, conversation_id: conversationRef.current }),
       });
-      setMessages([...history, { role: "assistant", content: res.reply, agent: res.agent, tool_calls: res.tool_calls }]);
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+          const event = frame.match(/^event: (.+)$/m)?.[1];
+          const raw = frame.match(/^data: (.*)$/m)?.[1];
+          if (!event || raw === undefined) continue;
+          let data;
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            continue;
+          }
+          if (event === "status") setStatus(data.text);
+          else if (event === "tool_call") {
+            setStatus(`${data.label}\u2026`);
+            calls = [...calls, { tool: data.tool, label: data.label, pending: true }];
+            paint();
+          } else if (event === "tool_result") {
+            calls = calls.map((c) => (c.tool === data.tool && c.pending ? { ...data, pending: false } : c));
+            paint();
+          } else if (event === "token") {
+            streamed += data;
+            paint();
+          } else if (event === "action_proposed") {
+            paint({ proposal: data });
+          } else if (event === "done") {
+            conversationRef.current = data.conversation_id ?? conversationRef.current;
+            streamed = data.reply ?? streamed;
+            calls = data.tool_calls?.length ? data.tool_calls : calls;
+            paint({ agent: data.agent, proposal: data.proposals?.[0] });
+          } else if (event === "error") {
+            paint({ agent: "error", content: data.detail });
+            setMessages([...history, { role: "assistant", content: data.detail, agent: "error" }]);
+          }
+        }
+      }
     } catch (error) {
-      setMessages([...history, { role: "assistant", content: error.message, agent: "error" }]);
+      if (error.name !== "AbortError") {
+        setMessages([...history, { role: "assistant", content: error.message, agent: "error" }]);
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
+      setStatus("");
     }
   };
 
@@ -215,7 +334,7 @@ export default function ChatPanel({ open, onClose }) {
         </div>
         <div className="flex items-center gap-0.5">
           {messages.length ? (
-            <IconButton icon={Trash} label="Clear conversation" size={15} onClick={() => setMessages([])} />
+            <IconButton icon={Trash} label="Clear conversation" size={15} onClick={reset} />
           ) : null}
           <IconButton icon={X} label="Close assistant" size={17} onClick={onClose} />
         </div>
@@ -270,12 +389,15 @@ export default function ChatPanel({ open, onClose }) {
                     <RichText text={message.content} />
                   )}
                 </div>
+                {message.proposal ? (
+                  <ConfirmCard proposal={message.proposal} busy={busy} onChoose={send} />
+                ) : null}
               </li>
             ))}
             {busy ? (
               <li className="flex items-center gap-2 text-[13px] text-ink-3" aria-live="polite">
                 <Spinner size={14} />
-                Reading live campus data…
+                {status || "Reading live campus data\u2026"}
               </li>
             ) : null}
           </ul>
