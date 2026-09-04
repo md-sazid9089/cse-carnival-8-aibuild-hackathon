@@ -94,34 +94,10 @@ def seed_rbac() -> bool:
         ("assignments:submit", "Submit Assignment", "assignments", "Submit solutions or assignments before deadlines"),
         ("assignments:manage", "Manage Assignments", "assignments", "Create, update, or delete assignments and set marks"),
         ("assignments:grade", "Grade Assignments", "assignments", "Review and grade student submissions"),
-        # courses
-        ("courses:view", "View Courses", "courses", "Browse the course catalogue and enrollments"),
-        ("courses:manage", "Manage Courses", "courses", "Create or edit courses and manage enrollments"),
         # system
         ("users:manage", "Manage Users", "system", "Manage user profiles and roles"),
         ("logs:view", "View Activity Logs", "system", "Inspect system audit logs and activity trail"),
     ]
-
-    # Mapping of which role gets which permissions
-    role_perms = {
-        "student": [
-            "schedules:view",
-            "rooms:view", "rooms:book", "rooms:cancel_own",
-            "events:view", "events:register", "events:cancel_own",
-            "announcements:view",
-            "assignments:view", "assignments:submit",
-            "courses:view",
-        ],
-        "teacher": [
-            "schedules:view", "schedules:manage",
-            "rooms:view", "rooms:book", "rooms:cancel_own",
-            "events:view", "events:register", "events:cancel_own", "events:manage",
-            "announcements:view", "announcements:create", "announcements:manage",
-            "assignments:view", "assignments:manage", "assignments:grade",
-            "courses:view", "courses:manage",
-        ],
-        "authority": [p[0] for p in permissions],  # All permissions
-    }
 
     from .services.auth import hash_password
 
@@ -130,21 +106,9 @@ def seed_rbac() -> bool:
         ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active", "student123"),
         ("usr-002", "student", "99-00001", None, "QA Tester", "qa.tester@aust.edu", "CSE", "active", "student123"),
         ("usr-003", "student", "20-40533", None, "Tanvir Ahmed", "tanvir.ahmed@aust.edu", "CSE", "active", "student123"),
-        ("usr-004", "teacher", None, "FAC-0101", "Prof. Dr. Md. Shahriar Mahbub", "shahriar.mahbub@aust.edu", "CSE", "active", "teacher123"),
-        ("usr-005", "teacher", None, "FAC-0102", "Prof. Dr. Md. Shamim Akhter", "shamim.akhter@aust.edu", "CSE", "active", "teacher123"),
-        ("usr-006", "authority", None, "AUTH-0001", "AUST Administration", "admin@aust.edu", "CSE", "active", "admin@aust2026"),
-        ("usr-007", "authority", None, "AUTH-0002", "Head of Department", "head.cse@aust.edu", "CSE", "active", "admin@aust2026"),
     ]
 
     with pool.connection() as conn:
-        for r_id, r_name, r_desc in roles:
-            conn.execute(
-                """INSERT INTO roles (id, name, description)
-                   VALUES (%s, %s, %s)
-                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description""",
-                [r_id, r_name, r_desc],
-            )
-
         for p_id, p_name, p_cat, p_desc in permissions:
             conn.execute(
                 """INSERT INTO permissions (id, name, category, description)
@@ -152,15 +116,6 @@ def seed_rbac() -> bool:
                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category, description = EXCLUDED.description""",
                 [p_id, p_name, p_cat, p_desc],
             )
-
-        for role_id, perms in role_perms.items():
-            for perm_id in perms:
-                conn.execute(
-                    """INSERT INTO role_permissions (role_id, permission_id)
-                       VALUES (%s, %s)
-                       ON CONFLICT DO NOTHING""",
-                    [role_id, perm_id],
-                )
 
         for u_id, role_id, student_id, employee_id, name, email, dept, status, plain_pw in users:
             pw_hash = hash_password(plain_pw)
