@@ -36,8 +36,8 @@ Every choice below is traced to a requirement in [PROBLEM_STATEMENT.md](../PROBL
 
 | Layer           | Choice                                                                                                                   | Why (researched)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime         | **Node.js 20+ (ESM)**                                                                                                    | One language end-to-end; judges certainly have Node; fastest to ship under deadline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Backend         | **Express 4**                                                                                                            | Boring and reliable; thin REST + one service layer shared by dashboard routes _and_ agent tools → a change made anywhere is the truth everywhere (R7)                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Runtime         | **Python 3.11+ backend, Node 18+ for the client build**                                                                  | User-directed switch to Python. FastAPI's typed request handling + auto OpenAPI docs suit the CRUD surface; Python's LLM/httpx ecosystem is mature                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Backend         | **FastAPI + psycopg3 (plain SQL)**                                                                                       | Thin REST + one service layer shared by dashboard routes _and_ agent tools → a change made anywhere is the truth everywhere (R7). No ORM — deadline-safe; SSE via StreamingResponse; local embeddings via `fastembed` (ONNX, no torch — light install for judges)                                                                                                                                                                                                                                                                                                                                                |
 | Database        | **PostgreSQL 16 via `pg`** (image `pgvector/pgvector:pg16`, Docker Compose)                                              | Production-grade persistence with real transactions: booking-conflict checks use `SELECT … FOR UPDATE` row locks, so concurrent dashboard+agent writes can't double-book. Native **full-text search** (`tsvector` + GIN) covers the sparse search leg and **pgvector** stores MiniLM embeddings, so hybrid search is one in-database SQL query. Trade-off vs SQLite (judge setup risk) accepted and mitigated: Compose one-liner as primary path, any hosted Postgres URL (Neon free tier) as no-Docker fallback. Plain SQL migrations, no ORM — deadline-safe                                                   |
 | LLM             | **OpenRouter** (`/api/v1/chat/completions`) — primary `z-ai/glm-5.2:free`, fallback `nvidia/nemotron-3.5-lightning:free` | User's available key. OpenAI-normalized schema: `tools: [{type:'function',…}]`, `tool_choice`, `finish_reason:'tool_calls'` — verified against the OpenRouter API reference. GLM 5.2 chosen on measured data: τ²-Bench 99.1%, Agentic Index 45.7 (top 20%), GPQA 89.5% — best free-tier tool-calling correctness; latency mitigated via streaming, compact prompts, capped `max_tokens`, `reasoning: high`. Lightning (0.2–0.5 s P50, ~200 tps) wired as instant fallback via `OPENROUTER_MODEL` env + `models` array. Note: free models capped ~50 req/day unless account ever bought $10 credits (→ ~1000/day) |
 | Agent framework | **None — hand-rolled multi-agent orchestration (router → specialists)**                                                  | Anthropic's researched patterns (routing + orchestrator-workers) implemented directly, no LangChain: a fast **Router** (Nemotron 3.5 Lightning, ~0.3 s) classifies each turn, then dispatches to a **read-only Analyst** or a **write-capable Coordinator** (both GLM 5.2) with role-scoped toolsets. Smaller toolset per specialist = higher tool-selection accuracy; the Analyst _physically cannot_ mutate (R8 by construction). Transparent code also _proves_ real tool calling (R9)                                                                                                                        |
@@ -90,31 +90,37 @@ flowchart TB
 
 ```
 docker-compose.yml        # pgvector/pgvector:pg16, one service, named volume
-server/
-  src/
-    index.js            # Express bootstrap, static serve in prod
-    db/  migrations/*.sql, pool.js, migrate.js, seed.js
-    services/           # schedules, rooms, events, announcements, assignments (all validation here)
-    routes/             # thin REST controllers per system + agent + search + sse
+backend/
+  requirements.txt
+  app/
+    main.py             # FastAPI bootstrap: lifespan = migrate + seed + embedder warmup; serves client/dist in prod
+    config.py           # .env loading, all settings
+    db.py               # psycopg pool, migrations runner, row serialization, id generation
+    seed.py             # loads data/*.json once when DB is empty
+    sse.py              # thread-safe SSE hub
+    migrations/001_init.sql
+    services/           # common (validation + DomainError), schedules, rooms, events, announcements, assignments
+    routers/api.py      # all thin REST controllers + /agent/chat + /search + /stream
     agents/
-      orchestrator.js   # entry: router → specialist dispatch, shared transcript, fallback path
-      router.js         # Lightning intent classification (forced JSON, no tools)
-      analyst.js        # read-only specialist (GLM 5.2, 8 read tools)
-      coordinator.js    # action specialist (GLM 5.2, 4 writes + 2 verify reads)
-      loop.js           # shared OpenRouter tool-calling loop (max 8 iterations)
-      tools/read.js, tools/write.js   # schemas + dispatcher → services
-      prompts.js        # per-agent system prompts + injected datetime/profile
-      openrouter.js     # single provider module (swap = 20 lines)
+      orchestrator.py   # Router → Analyst/Coordinator dispatch + FALLBACK_SINGLE_AGENT path
+      loop.py           # shared OpenRouter tool-calling loop (max 8 iterations)
+      tools.py          # read/write tool schemas + dispatcher → services
+      prompts.py        # per-agent prompts + injected datetime/profile
+      openrouter.py     # single provider module
     search/
-      hybrid.js         # one SQL query: tsvector + pgvector + RRF
-      embedder.js       # MiniLM singleton, embed-on-write
+      hybrid.py         # one SQL query: tsvector + pgvector + RRF
+      indexer.py        # search_index maintenance on write
+      embedder.py       # fastembed singleton (384-dim), graceful degradation
 client/
   src/
-    pages/              # Overview, Schedules, Rooms, Events, Announcements, Assignments
-    components/         # DataTable, RecordModal, ChatPanel, AgentBadge, ToolCallChip, Toast
-    hooks/              # useApi, useSSE, useChat
+    App.jsx             # sidebar tabs + profile switcher + chat dock
+    entities.jsx        # per-system column/field configs (config-driven CRUD)
+    pages/              # Overview, ResourcePage (generic), Rooms, Events
+    components/         # DataTable, RecordModal, ChatPanel, Toast
+    hooks.js            # useApi, useSSE
 data/                   # unchanged seed JSON (never written to — per README)
-.env.example            # DATABASE_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL, PORT
+.env.example            # DATABASE_URL, OPENROUTER_*, FALLBACK_SINGLE_AGENT, EMBEDDINGS_ENABLED
+TEAM_PLAN.md            # ownership: Tayeb (agents+UI), Shehab (testing+consistency), Sazid (deployment+ops)
 ```
 
 ---

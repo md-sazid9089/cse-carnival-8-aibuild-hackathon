@@ -1,0 +1,14 @@
+{
+  "name": "campusos",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "dev:web": "cd client && npm run dev",
+    "build": "cd client && npm install && npm run build",
+    "start": "cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
