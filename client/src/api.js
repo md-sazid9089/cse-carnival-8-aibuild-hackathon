@@ -4,30 +4,6 @@ export const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, ""
 const STORAGE_USER_KEY = "campusos_user";
 const STORAGE_TOKEN_KEY = "campusos_token";
 
-// Same-origin: Vite proxies /api in dev, FastAPI serves the built client in prod.
-export const API_BASE = "";
-
-const DEFAULT_USER = {
-  id: "usr-001",
-  student_id: "20-40532",
-  name: "Sakibul Hassan",
-  email: "sakibul.hassan@aust.edu",
-  role_id: "student",
-  department: "CSE",
-  permissions: [
-    "schedules:view",
-    "rooms:view",
-    "rooms:book",
-    "rooms:cancel_own",
-    "events:view",
-    "events:register",
-    "events:cancel_own",
-    "announcements:view",
-    "assignments:view",
-    "assignments:submit",
-  ],
-};
-
 function loadStoredUser() {
   try {
     const raw = localStorage.getItem(STORAGE_USER_KEY);

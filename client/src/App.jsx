@@ -2,10 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPanel, { AssistantFab } from "./components/ChatPanel.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import ConfirmHost from "./components/ConfirmDialog.jsx";
-import { useEffect, useState } from "react";
-import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
-import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApiProfile, toast } from "./api.js";
-import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
 import { Button, IconButton, Kbd } from "./components/ui.jsx";
 import { useMediaQuery, useTheme } from "./hooks.js";
@@ -15,14 +11,13 @@ import { cx, initials } from "./lib/format.js";
 import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
 import Announcements from "./pages/Announcements.jsx";
 import Assignments from "./pages/Assignments.jsx";
-import { entities } from "./entities.jsx";
-import LandingPage from "./landing/LandingPage.tsx";
 import Events from "./pages/Events.jsx";
 import Overview from "./pages/Overview.jsx";
 import Rooms from "./pages/Rooms.jsx";
 import Schedules from "./pages/Schedules.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
+import LandingPage from "./landing/LandingPage.tsx";
 
 const NAV = [
   { id: "overview", label: "Today", icon: Today },
@@ -111,49 +106,6 @@ function Shell() {
   useFocusTrap({ active: drawer, containerRef: drawerRef, onClose: () => setDrawer(false) });
 
   // Auto-close when the dock no longer fits; never re-open a panel the user closed.
-function getRouteFromPath(pathname) {
-  const decoded = decodeURIComponent(pathname || "").toLowerCase().trim();
-  if (decoded === "/" || decoded === "") return "landing";
-  if (
-    decoded === "/auth/signin" ||
-    decoded === "/auth/sign-in" ||
-    decoded === "/auth/sign in" ||
-    decoded === "/auth/sign%20in" ||
-    decoded === "/auth/login" ||
-    decoded === "/signin" ||
-    decoded === "/login"
-  ) {
-    return "signin";
-  }
-  if (
-    decoded === "/auth/signup" ||
-    decoded === "/auth/sign-up" ||
-    decoded === "/auth/sign up" ||
-    decoded === "/auth/sign%20up" ||
-    decoded === "/auth/register" ||
-    decoded === "/signup" ||
-    decoded === "/register"
-  ) {
-    return "signup";
-  }
-  for (const item of NAV) {
-    if (decoded === `/${item.id}`) return item.id;
-  }
-  return "overview";
-}
-
-export default function App() {
-  const [tab, setTab] = useState(() => getRouteFromPath(window.location.pathname));
-  const [user, setUser] = useState(getStoredUser);
-  const [chatOpen, setChatOpen] = useState(true);
-
-  const profile = {
-    student_id: user?.student_id || (user?.role_id === "student" ? "20-40532" : ""),
-    name: user?.name || "Sakibul Hassan",
-    role: user?.role_id || "student",
-    email: user?.email || "",
-  };
-
   useEffect(() => {
     if (!isWide) setChatOpen(false);
   }, [isWide]);
@@ -187,56 +139,6 @@ export default function App() {
     announcements: <Announcements initialQuery={navQuery} />,
     assignments: <Assignments initialQuery={navQuery} />,
   };
-  const navigateTo = (newTab, updateHistory = true) => {
-    setTab(newTab);
-    if (updateHistory) {
-      let targetPath = "/overview";
-      if (newTab === "landing") targetPath = "/";
-      else if (newTab === "signin") targetPath = "/auth/signin";
-      else if (newTab === "signup") targetPath = "/auth/signup";
-      else if (newTab !== "overview") targetPath = `/${newTab}`;
-      window.history.pushState(null, "", targetPath);
-    }
-  };
-
-  // Landing CTAs hand over a path; resolve it to a tab so the SPA stays in control.
-  const navigateToPath = (path) => {
-    window.history.pushState(null, "", path);
-    setTab(getRouteFromPath(path));
-    window.scrollTo({ top: 0 });
-  };
-
-  const handleSignOut = () => {
-    clearAuth();
-    toast("Signed out successfully", "info");
-    navigateTo("overview");
-  };
-
-  // If on Sign In or Sign Up routes, render dedicated full-page auth screens
-  if (tab === "landing") {
-    return <LandingPage onNavigate={navigateToPath} />;
-  }
-
-  if (tab === "signin") {
-    return (
-      <>
-        <SignIn onNavigate={navigateTo} onSuccess={() => navigateTo("overview")} />
-        <Toast />
-      </>
-    );
-  }
-
-  if (tab === "signup") {
-    return (
-      <>
-        <SignUp onNavigate={navigateTo} onSuccess={() => navigateTo("overview")} />
-        <Toast />
-      </>
-    );
-  }
-
-  const isAuthority = user?.role_id === "authority";
-  const hasToken = !!getStoredToken();
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -267,21 +169,6 @@ export default function App() {
             </span>
           </button>
           <AccountCard />
-
-        <div className="py-2 flex-1 overflow-y-auto">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => navigateTo(n.id)}
-              className={`w-full text-left px-4 py-2.5 text-sm flex gap-2.5 items-center transition-colors ${
-                tab === n.id
-                  ? "bg-slate-800 text-white font-medium border-l-4 border-indigo-500"
-                  : "hover:bg-slate-800/60 text-slate-300"
-              }`}
-            >
-              <span className="text-base"><n.icon /></span> {n.label}
-            </button>
-          ))}
         </div>
       </aside>
 
@@ -351,9 +238,9 @@ export default function App() {
 }
 
 /** Nothing is readable without an identity: the whole dashboard is scoped to the signed-in account. */
-function Gate() {
+function Gate({ initialView = "signin" }) {
   const { account } = useCampus();
-  const [view, setView] = useState("signin");
+  const [view, setView] = useState(initialView);
 
   if (account) return <Shell />;
 
@@ -366,10 +253,33 @@ function Gate() {
   );
 }
 
+const isLandingPath = (pathname) => pathname === "/" || pathname === "";
+
 export default function App() {
+  // "/" is the marketing page; every other path drops into the gated app.
+  const [entered, setEntered] = useState(() => !isLandingPath(window.location.pathname));
+  const [initialView, setInitialView] = useState(() =>
+    /signup|register/i.test(window.location.pathname) ? "signup" : "signin",
+  );
+
+  useEffect(() => {
+    const onPop = () => setEntered(!isLandingPath(window.location.pathname));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const enter = (path) => {
+    window.history.pushState(null, "", path);
+    setInitialView(/signup|register/i.test(path) ? "signup" : "signin");
+    setEntered(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  if (!entered) return <LandingPage onNavigate={enter} />;
+
   return (
     <CampusProvider>
-      <Gate />
+      <Gate initialView={initialView} />
     </CampusProvider>
   );
 }
