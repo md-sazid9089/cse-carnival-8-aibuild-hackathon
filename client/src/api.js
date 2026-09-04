@@ -1,3 +1,6 @@
+// Deployed frontend (e.g. Vercel) points at the hosted backend; empty = same-origin/Vite proxy
+export const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+
 const STORAGE_USER_KEY = "campusos_user";
 const STORAGE_TOKEN_KEY = "campusos_token";
 
@@ -98,7 +101,7 @@ async function request(method, path, body) {
   }
   if (body) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(path, {
+  const res = await fetch(API_BASE + path, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

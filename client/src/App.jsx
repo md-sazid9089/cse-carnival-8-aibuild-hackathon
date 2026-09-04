@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
 import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApiProfile, toast } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
