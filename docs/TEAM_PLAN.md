@@ -47,9 +47,9 @@
 - Any schema change goes in a new `backend/app/migrations/00X_*.sql` file (never edit 001).
 - Ping the group before touching another owner's area.
 
-## Milestones (today)
+## Before judging
 
-1. Everyone: fresh clone + run locally, smoke-test one CRUD + one agent query.
-2. Mid-afternoon: Shehab's test script green locally; Tayeb's sample-query battery passes; Sazid has staging deploy.
-3. 7:00 PM: feature freeze — only fixes. Full judge simulation on the deployed + local build.
-4. 8:00 PM: repo public, README final, form submitted. Do not cut it to 8:29.
+1. Everyone: fresh clone + run locally, smoke-test one CRUD path and one agent query.
+2. All four test suites green locally and against the deployed API.
+3. Full judge simulation on both local and deployed: sample queries, the four traps, and the mid-eval edit drill.
+4. Repo public, README final, live URL in place, form submitted.
