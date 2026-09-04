@@ -306,7 +306,9 @@ Tool results return structured `{ok, data}` or `{ok:false, reason:'ROOM_CONFLICT
 
 ### Authorization model (R8, kept honest for a hackathon)
 
-Single-user app with a profile context. Enforced _server-side_ in services: cancel/modify only your own bookings and registrations; capacity and conflict rules cannot be overridden by any phrasing — and the database's EXCLUDE/CHECK constraints back the services. The agents' refusals are therefore triple-layered: router classification → service 403-style errors → DB constraints.
+Every request is signed in; every account is a student. Enforced _server-side_ in services: cancel/modify only your own bookings and registrations; capacity and conflict rules cannot be overridden by any phrasing — and the database's EXCLUDE/CHECK constraints back the services. The agents' refusals are therefore triple-layered: router classification → service 403-style errors → DB constraints.
+
+**Per-student scoping.** The provided dataset describes one cohort, so `data/enrollments.json` adds the missing fact — which courses each student is registered for — into `course_enrollments`. `GET /api/schedules?mine=1`, the Overview dashboard and the agent's `get_briefing` / `get_next_class` / `list_schedules(mine=true)` all read it, so a routine belongs to a person: the Cyber Security track and the Data Warehousing track see different weeks, and a student repeating three courses sees a short one. Anyone the file does not name — including a judge who signs up — is enrolled in the full cohort load, so a new account never opens on an empty week. The plain `GET /api/schedules` is still the whole timetable, because managing the campus data is a separate job from reading your own.
 
 ---
 

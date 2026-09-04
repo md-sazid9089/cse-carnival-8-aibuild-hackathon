@@ -104,6 +104,31 @@ All seed data lives in the `data/` folder as JSON files. Below are the exact fie
 
 ---
 
+## 6. Enrollments (`data/enrollments.json`) — added by us
+
+The five files above describe one cohort's campus. They do not say **who takes what**, so without
+this file every account would see the same 24-row timetable. Each entry registers one student for a
+subset of the cohort's courses; `GET /api/schedules?mine=1` and the agent's personal tools read it,
+so two students genuinely see different routines.
+
+The object has a `note` and a `students` array:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `student_id` | `string` | Matches `registrations.student_id` (e.g. `"20-40532"`) |
+| `name` | `string` | Full name — an account is created from it on boot |
+| `department` | `string` | Department code (e.g. `"CSE"`) |
+| `section` | `string` | Section label for theory classes (e.g. `"B"`) |
+| `lab_group` | `string` | Sub-group for lab classes (e.g. `"B1"`, `"B2"`) |
+| `elective` | `string` | Elective track name, `""` if none |
+| `courses` | `string[]` | Course codes the student is registered for |
+| `note` | `string` | Optional — why this student's load is unusual |
+
+Listed students are enrolled in exactly these courses; anyone else — including a judge who signs up —
+starts on the full cohort load, so a new account is never given an empty week.
+
+---
+
 ## Room Numbering Convention (AUST)
 
 Rooms follow the pattern `[Floor][Wing][Number]`:

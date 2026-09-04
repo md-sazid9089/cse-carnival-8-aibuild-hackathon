@@ -154,6 +154,7 @@ cd backend
 python tests/smoke_api.py        # CRUD, conflicts, capacity, ownership, SQL injection, live search
 python tests/test_auth_rbac.py   # password hashing, sign-in/up, tokens, ownership rules
 python tests/test_agent.py       # tool loop, key rotation, failover, rate limits
+python tests/test_enrollments.py # per-student routines: two students, two different weeks
 ```
 
 </details>
