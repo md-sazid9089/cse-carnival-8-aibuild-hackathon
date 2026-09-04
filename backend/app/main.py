@@ -14,7 +14,7 @@ from .db import migrate
 from .routers.api import router
 from .search.embedder import warmup_async
 from .search.indexer import reindex_all
-from .seed import seed_if_empty
+from .seed import seed_if_empty, seed_rbac
 from .services.common import DomainError
 
 log = logging.getLogger("campusos")
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     sse.set_loop(asyncio.get_running_loop())
     migrate()
     seeded = seed_if_empty()
+    seed_rbac()
     print(f"[startup] database ready (seeded={seeded})")
     warmup_async()
     reindex_all()  # backfills any rows still missing embeddings (idempotent)

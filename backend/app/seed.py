@@ -1,4 +1,4 @@
-"""Load seed JSON into Postgres on first boot. Repo JSON files are never mutated."""
+"""Load seed JSON into Postgres on first boot and manage RBAC seeds. Repo JSON files are never mutated."""
 import json
 
 from .config import DATA_DIR
@@ -10,7 +10,119 @@ def _load(name: str):
     return json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
 
 
+def seed_rbac() -> bool:
+    """Seed roles, permissions, role-permission matrix, and seed users idempotently."""
+    roles = [
+        ("student", "Student", "Undergraduate / graduate student enrolled in university courses"),
+        ("teacher", "Teacher / Faculty", "Academic instructor, professor, or lab lecturer"),
+        ("authority", "Campus Authority", "Administrative staff, department head, or campus administration"),
+    ]
+
+    permissions = [
+        # schedules
+        ("schedules:view", "View Schedules", "schedules", "View class routines and timetables"),
+        ("schedules:manage", "Manage Schedules", "schedules", "Create, edit, or delete class schedule slots"),
+        # rooms
+        ("rooms:view", "View Rooms", "rooms", "Browse rooms, equipment, capacity, and current bookings"),
+        ("rooms:book", "Book Room", "rooms", "Book a free room for study, lab, or class session"),
+        ("rooms:cancel_own", "Cancel Own Booking", "rooms", "Cancel reservations booked by oneself"),
+        ("rooms:manage", "Manage Rooms", "rooms", "Add, edit, or remove rooms and configure equipment"),
+        ("rooms:override_bookings", "Override Bookings", "rooms", "Cancel or reassign any room reservation"),
+        # events
+        ("events:view", "View Events", "events", "Browse campus events, workshops, and seminars"),
+        ("events:register", "Register for Event", "events", "Register for an open campus event"),
+        ("events:cancel_own", "Cancel Event Registration", "events", "Cancel one's own event registration"),
+        ("events:manage", "Manage Events", "events", "Create, edit, cancel, or delete campus events"),
+        # announcements
+        ("announcements:view", "View Announcements", "announcements", "Read notices and departmental announcements"),
+        ("announcements:create", "Create Announcements", "announcements", "Post notices, rescheduling updates, or alerts"),
+        ("announcements:manage", "Manage Announcements", "announcements", "Edit or take down existing announcements"),
+        # assignments
+        ("assignments:view", "View Assignments", "assignments", "View course assignments, tasks, and deadlines"),
+        ("assignments:submit", "Submit Assignment", "assignments", "Submit solutions or assignments before deadlines"),
+        ("assignments:manage", "Manage Assignments", "assignments", "Create, update, or delete assignments and set marks"),
+        ("assignments:grade", "Grade Assignments", "assignments", "Review and grade student submissions"),
+        # system
+        ("users:manage", "Manage Users", "system", "Manage user profiles and roles"),
+        ("logs:view", "View Activity Logs", "system", "Inspect system audit logs and activity trail"),
+    ]
+
+    # Mapping of which role gets which permissions
+    role_perms = {
+        "student": [
+            "schedules:view",
+            "rooms:view", "rooms:book", "rooms:cancel_own",
+            "events:view", "events:register", "events:cancel_own",
+            "announcements:view",
+            "assignments:view", "assignments:submit",
+        ],
+        "teacher": [
+            "schedules:view", "schedules:manage",
+            "rooms:view", "rooms:book", "rooms:cancel_own",
+            "events:view", "events:register", "events:cancel_own", "events:manage",
+            "announcements:view", "announcements:create", "announcements:manage",
+            "assignments:view", "assignments:manage", "assignments:grade",
+        ],
+        "authority": [p[0] for p in permissions],  # All permissions
+    }
+
+    users = [
+        # (id, role_id, student_id, employee_id, name, email, department, status)
+        ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active"),
+        ("usr-002", "student", "99-00001", None, "QA Tester", "qa.tester@aust.edu", "CSE", "active"),
+        ("usr-003", "student", "20-40533", None, "Tanvir Ahmed", "tanvir.ahmed@aust.edu", "CSE", "active"),
+        ("usr-004", "teacher", None, "FAC-0101", "Prof. Dr. Md. Shahriar Mahbub", "shahriar.mahbub@aust.edu", "CSE", "active"),
+        ("usr-005", "teacher", None, "FAC-0102", "Prof. Dr. Md. Shamim Akhter", "shamim.akhter@aust.edu", "CSE", "active"),
+        ("usr-006", "authority", None, "AUTH-0001", "AUST Administration", "admin@aust.edu", "CSE", "active"),
+        ("usr-007", "authority", None, "AUTH-0002", "Head of Department", "head.cse@aust.edu", "CSE", "active"),
+    ]
+
+    with pool.connection() as conn:
+        for r_id, r_name, r_desc in roles:
+            conn.execute(
+                """INSERT INTO roles (id, name, description)
+                   VALUES (%s, %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description""",
+                [r_id, r_name, r_desc],
+            )
+
+        for p_id, p_name, p_cat, p_desc in permissions:
+            conn.execute(
+                """INSERT INTO permissions (id, name, category, description)
+                   VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category, description = EXCLUDED.description""",
+                [p_id, p_name, p_cat, p_desc],
+            )
+
+        for role_id, perms in role_perms.items():
+            for perm_id in perms:
+                conn.execute(
+                    """INSERT INTO role_permissions (role_id, permission_id)
+                       VALUES (%s, %s)
+                       ON CONFLICT DO NOTHING""",
+                    [role_id, perm_id],
+                )
+
+        for u_id, role_id, student_id, employee_id, name, email, dept, status in users:
+            conn.execute(
+                """INSERT INTO users (id, role_id, student_id, employee_id, name, email, department, status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET
+                       name = EXCLUDED.name,
+                       email = EXCLUDED.email,
+                       role_id = EXCLUDED.role_id,
+                       student_id = EXCLUDED.student_id,
+                       employee_id = EXCLUDED.employee_id,
+                       department = EXCLUDED.department,
+                       status = EXCLUDED.status""",
+                [u_id, role_id, student_id, employee_id, name, email, dept, status],
+            )
+    return True
+
+
 def seed_if_empty() -> bool:
+    seed_rbac()
+
     if q1("SELECT COUNT(*) AS n FROM schedules")["n"] > 0:
         return False
 
