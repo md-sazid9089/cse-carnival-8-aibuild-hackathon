@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
 import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApiProfile, toast } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
@@ -159,7 +160,7 @@ export default function App() {
                   : "hover:bg-slate-800/60 text-slate-300"
               }`}
             >
-              <span className="text-base">{n.icon}</span> {n.label}
+              <span className="text-base"><n.icon /></span> {n.label}
             </button>
           ))}
         </div>
