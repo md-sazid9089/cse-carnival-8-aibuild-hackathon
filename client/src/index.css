@@ -132,6 +132,52 @@
   --animate-shimmer: shimmer 1.6s linear infinite;
 }
 
+/* ---------------------------------------------------------------------------
+   Landing page tokens — warm editorial palette, scoped by name (cream/forest/…)
+   so they never collide with the dashboard's "Paper & Ink" system above.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-cream-50: #fbf8f3;
+  --color-cream-100: #f1e9dc;
+  --color-cream-200: #e6dccb;
+  --color-peach: #e8cdbb;
+  --color-terracotta: #b97861;
+  --color-terracotta-deep: #9c6350;
+  --color-sage: #a9b8ac;
+  --color-moss: #71877b;
+  --color-forest: #34483f;
+  --color-forest-deep: #26352f;
+  --color-ink-muted: #69746e;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgba(38, 53, 47, 0.05), 0 10px 30px -14px rgba(38, 53, 47, 0.18);
+  --shadow-lift: 0 2px 4px rgba(38, 53, 47, 0.06), 0 24px 48px -20px rgba(38, 53, 47, 0.28);
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+}
+
+.landing {
+  font-family: var(--font-body);
+  color-scheme: light;
+}
+
+.landing ::selection {
+  background: color-mix(in oklab, var(--color-peach) 70%, white);
+  color: var(--color-forest-deep);
+}
+
 @keyframes fade-in {
   from { opacity: 0 }
   to { opacity: 1 }

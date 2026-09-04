@@ -105,14 +105,6 @@ def auth_me(authorization: str | None = Header(default=None),
     return who
 
 
-@router.get("/auth/users")
-def auth_users(authorization: str | None = Header(default=None)):
-    # the directory carries every account's email, so it stays behind a signed authority token
-    if _identity(authorization=authorization)["role"] != "authority":
-        raise DomainError("FORBIDDEN", "Only campus authorities can list user accounts", 403)
-    return auth.list_users()
-
-
 # ---- schedules ----
 @router.get("/schedules")
 def schedules_list(day: str | None = None, course: str | None = None, instructor: str | None = None):
@@ -183,6 +175,7 @@ def booking_cancel(rid: str, booking_id: str,
                    authorization: str | None = Header(default=None)):
     who = _identity(x_student_id, x_student_name, authorization)
     return rooms.cancel_booking(booking_id, requested_by=who["name"], full_access=True)
+    return rooms.cancel_booking(booking_id, requested_by=who["name"])
 
 
 # ---- events + registrations ----
@@ -222,6 +215,8 @@ def registration_cancel(eid: str, student_id: str,
                         x_student_name: str | None = Header(default=None),
                         authorization: str | None = Header(default=None)):
     who = _identity(x_student_id, x_student_name, authorization)
+    if who["student_id"] != student_id:
+        raise DomainError("FORBIDDEN", "You can only cancel your own registration", 403)
     return events.cancel_registration(eid, student_id)
 
 

@@ -48,6 +48,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
       const res = await api.signin({ email_or_id: ident.trim(), password });
       setAuth(res.user, res.token);
       toast(`Welcome back, ${res.user.name}!`, "success");
+      toast(`Welcome back, ${res.user.name}!`, "success");
       if (onSuccess) onSuccess(res.user);
       else if (onNavigate) onNavigate("overview");
     } catch (err) {
@@ -102,13 +103,13 @@ export default function SignIn({ onNavigate, onSuccess }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Email or Student / Employee ID
+                Email or Student ID
               </label>
               <input
                 type="text"
                 value={ident}
                 onChange={(e) => setIdent(e.target.value)}
-                placeholder="e.g. sakibul.hassan@aust.edu or admin@aust.edu"
+                placeholder="e.g. sakibul.hassan@aust.edu or 20-40532"
                 required
                 className="w-full rounded-lg bg-slate-900/90 border border-slate-600 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
@@ -164,9 +165,7 @@ export default function SignIn({ onNavigate, onSuccess }) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-200 group-hover:text-white">{acc.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${acc.badgeCls}`}>
-                      {acc.role}
-                    </span>
+                    <span className="text-[10px] text-slate-400">{acc.desc}</span>
                   </div>
                   <span className="text-[11px] text-slate-400">{acc.email} · {acc.password}</span>
                 </button>

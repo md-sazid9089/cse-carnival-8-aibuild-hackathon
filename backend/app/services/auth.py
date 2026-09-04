@@ -72,6 +72,16 @@ def parse_token(token: str) -> dict | None:
         return None
 
 
+STUDENT_PERMISSIONS = [
+    "schedules:view",
+    "rooms:view", "rooms:book", "rooms:cancel_own",
+    "events:view", "events:register", "events:cancel_own",
+    "announcements:view",
+    "assignments:view", "assignments:submit",
+    "courses:view",
+]
+
+
 def get_user_permissions(role_id: str = "student") -> list[str]:
     """Every student has full access across all systems per PROBLEM_STATEMENT.md."""
     rows = q("SELECT id FROM permissions")

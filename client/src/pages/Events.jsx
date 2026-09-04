@@ -179,7 +179,7 @@ export default function Events({ initialQuery = "" }) {
     <div className="animate-fade-in">
       <PageHeader
         title="Events"
-        blurb="Workshops, seminars and campus activities. Registering here updates the same counts the assistant reads."
+        blurb="Workshops, seminars and campus activities you can register for."
         actions={
           <Button variant="primary" icon={Plus} onClick={crud.openCreate}>
             <span className="hidden sm:inline">Add event</span>
