@@ -131,12 +131,14 @@ class Gateway:
     # ---- lifecycle ----
     async def client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
+            headers = {"Content-Type": "application/json", "X-Title": "CampusOS"}
+            if config.APP_URL:  # OpenRouter attribution, only meaningful once deployed
+                headers["HTTP-Referer"] = config.APP_URL
             self._client = httpx.AsyncClient(
                 base_url=config.OPENROUTER_BASE_URL,
                 timeout=httpx.Timeout(config.AGENT_CALL_TIMEOUT_S, connect=5.0, read=config.AGENT_CALL_TIMEOUT_S,
                                       write=10.0, pool=5.0),
-                headers={"Content-Type": "application/json",
-                         "HTTP-Referer": config.APP_URL, "X-Title": "CampusOS"},
+                headers=headers,
             )
         return self._client
 

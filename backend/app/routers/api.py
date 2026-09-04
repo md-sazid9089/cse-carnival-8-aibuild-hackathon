@@ -2,11 +2,10 @@
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Body, Header, Request
+from fastapi import APIRouter, Body, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 
 from .. import sse
@@ -19,37 +18,29 @@ from ..services import announcements, assignments, auth, events, rooms, schedule
 from ..services.common import DomainError
 
 log = logging.getLogger("campusos.api")
-router = APIRouter(prefix="/api")
-
-DEFAULT_PROFILE = {"student_id": "20-40532", "name": "Sakibul Hassan", "role": "student"}
-STUDENT_ID_RE = re.compile(r"^[0-9]{2}-[0-9]{5}$")
 
 
-def _identity(x_student_id: str | None = None,
-              x_student_name: str | None = None,
-              authorization: str | None = None) -> dict:
-    """Acting profile.
+def current_user(authorization: str | None = Header(default=None)) -> dict:
+    """The signed-in account, or 401.
 
-    A signed bearer token is the only source of a privileged role: the client may assert
-    *who* it is (demo profile switcher) but never *what it may do* — a self-declared
-    role header would let anyone cancel other people's bookings.
+    Identity is never inferred from a client-supplied name or ID: only a signature this
+    server issued counts, so nobody can act as somebody else by editing a header.
     """
-    if authorization and authorization.startswith("Bearer "):
-        claims = auth.parse_token(authorization.split(" ", 1)[1].strip())
-        if claims:
-            return {
-                "id": claims.get("uid"),
-                "student_id": claims.get("student_id") or DEFAULT_PROFILE["student_id"],
-                "name": claims.get("name") or DEFAULT_PROFILE["name"],
-                "role": claims.get("role") or "student",
-                "email": claims.get("email"),
-            }
-    sid = (x_student_id or "").strip()
-    name = (x_student_name or "").strip()[:80]
-    if not STUDENT_ID_RE.match(sid):
-        sid = DEFAULT_PROFILE["student_id"]
-        name = name or DEFAULT_PROFILE["name"]
-    return {"id": None, "student_id": sid, "name": name or DEFAULT_PROFILE["name"], "role": "student"}
+    header = authorization or ""
+    claims = auth.parse_token(header.split(" ", 1)[1].strip()) if header.startswith("Bearer ") else None
+    if not claims:
+        raise DomainError("UNAUTHENTICATED", "Sign in to continue", 401)
+    return {
+        "id": claims.get("uid"),
+        "student_id": claims.get("student_id") or "",
+        "name": claims.get("name") or "",
+        "email": claims.get("email"),
+    }
+
+
+# Everything on `router` requires a valid session; open endpoints live on `public`.
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
+public = APIRouter(prefix="/api")
 
 
 def _last_user_message(payload: dict) -> str:
@@ -67,26 +58,26 @@ def _last_user_message(payload: dict) -> str:
     return message
 
 
-@router.get("/meta")
+@public.get("/meta")
 def meta():
     now = datetime.now(ZoneInfo(TZ_NAME))
     return {"now": now.isoformat(), "today": now.date().isoformat(), "weekday": now.strftime("%A"), "tz": TZ_NAME}
 
 
 # ---- auth ----
-@router.post("/auth/signup")
+@public.post("/auth/signup")
 def auth_signup(data: dict = Body(...)):
     return auth.sign_up(
         name=data.get("name"),
         email=data.get("email"),
         password=data.get("password"),
         student_id=data.get("student_id"),
-        department=data.get("department", "CSE"),
+        department=data.get("department"),
     )
 
 
-@router.post("/auth/signin")
-@router.post("/auth/login")
+@public.post("/auth/signin")
+@public.post("/auth/login")
 def auth_signin(data: dict = Body(...)):
     ident = data.get("email_or_id") or data.get("email") or data.get("student_id") or data.get("username")
     return auth.sign_in(
@@ -96,13 +87,8 @@ def auth_signin(data: dict = Body(...)):
 
 
 @router.get("/auth/me")
-def auth_me(authorization: str | None = Header(default=None),
-            x_student_id: str | None = Header(default=None),
-            x_student_name: str | None = Header(default=None)):
-    who = _identity(x_student_id, x_student_name, authorization)
-    if who.get("id"):
-        return auth.get_me(who["id"])
-    return who
+def auth_me(who: dict = Depends(current_user)):
+    return auth.get_me(who["id"])
 
 
 # ---- schedules ----
@@ -158,22 +144,14 @@ def rooms_delete(rid: str):
 
 
 @router.post("/rooms/{rid}/bookings")
-def booking_create(rid: str, data: dict = Body(...),
-                   x_student_id: str | None = Header(default=None),
-                   x_student_name: str | None = Header(default=None),
-                   authorization: str | None = Header(default=None)):
+def booking_create(rid: str, data: dict = Body(...), who: dict = Depends(current_user)):
     room = rooms.get_room(rid)
     data.pop("booked_by", None)
-    who = _identity(x_student_id, x_student_name, authorization)
     return rooms.add_booking(room["room_number"], data, who["name"])
 
 
 @router.delete("/rooms/{rid}/bookings/{booking_id}")
-def booking_cancel(rid: str, booking_id: str,
-                   x_student_id: str | None = Header(default=None),
-                   x_student_name: str | None = Header(default=None),
-                   authorization: str | None = Header(default=None)):
-    who = _identity(x_student_id, x_student_name, authorization)
+def booking_cancel(rid: str, booking_id: str, who: dict = Depends(current_user)):
     return rooms.cancel_booking(booking_id, requested_by=who["name"])
 
 
@@ -200,20 +178,12 @@ def events_delete(eid: str):
 
 
 @router.post("/events/{eid}/registrations")
-def registration_create(eid: str,
-                        x_student_id: str | None = Header(default=None),
-                        x_student_name: str | None = Header(default=None),
-                        authorization: str | None = Header(default=None)):
-    who = _identity(x_student_id, x_student_name, authorization)
+def registration_create(eid: str, who: dict = Depends(current_user)):
     return events.register(eid, who["student_id"], who["name"])
 
 
 @router.delete("/events/{eid}/registrations/{student_id}")
-def registration_cancel(eid: str, student_id: str,
-                        x_student_id: str | None = Header(default=None),
-                        x_student_name: str | None = Header(default=None),
-                        authorization: str | None = Header(default=None)):
-    who = _identity(x_student_id, x_student_name, authorization)
+def registration_cancel(eid: str, student_id: str, who: dict = Depends(current_user)):
     if who["student_id"] != student_id:
         raise DomainError("FORBIDDEN", "You can only cancel your own registration", 403)
     return events.cancel_registration(eid, student_id)
@@ -270,19 +240,13 @@ def search(q: str):
 
 
 @router.post("/agent/chat")
-async def agent_chat(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
-                     x_student_name: str | None = Header(default=None),
-                     authorization: str | None = Header(default=None)):
-    profile = _identity(x_student_id, x_student_name, authorization)
+async def agent_chat(payload: dict = Body(...), profile: dict = Depends(current_user)):
     message = _last_user_message(payload)
     return await run_turn(message, profile, payload.get("conversation_id"))
 
 
 @router.post("/agent/chat/stream")
-async def agent_chat_stream(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
-                            x_student_name: str | None = Header(default=None),
-                            authorization: str | None = Header(default=None)):
-    profile = _identity(x_student_id, x_student_name, authorization)
+async def agent_chat_stream(payload: dict = Body(...), profile: dict = Depends(current_user)):
     message = _last_user_message(payload)
     conversation_id = payload.get("conversation_id")
     queue: asyncio.Queue = asyncio.Queue(maxsize=200)
@@ -320,7 +284,7 @@ async def agent_chat_stream(payload: dict = Body(...), x_student_id: str | None 
                                       "Connection": "keep-alive"})
 
 
-@router.get("/health")
+@public.get("/health")
 def health():
     db_ok = True
     try:
@@ -330,7 +294,9 @@ def health():
     return {"status": "ok" if db_ok else "degraded", "db": db_ok, **gateway.health()}
 
 
-@router.get("/stream")
+# EventSource cannot send an Authorization header; the stream only announces which entity
+# changed (never record contents), so subscribers still have to fetch through the guarded API.
+@public.get("/stream")
 async def stream(request: Request):
     return StreamingResponse(sse.subscribe(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

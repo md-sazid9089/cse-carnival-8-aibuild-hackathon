@@ -16,14 +16,18 @@ const greeting = (time) => {
 
 /** First class at or after now in the Sun–Thu cycle, so the card still answers
  *  "what's next?" late in the evening or on a weekend. */
+/** First class at or after now, walking the teaching week. Days present in the
+ *  data but outside the canonical week are included so the card and the
+ *  timetable never disagree. */
 function findNextClass(rows, weekday, nowMinutes) {
-  const startIndex = DAYS.indexOf(weekday);
+  const cycle = [...DAYS, ...new Set(rows.map((row) => row.day).filter((day) => !DAYS.includes(day)))];
+  const startIndex = cycle.indexOf(weekday);
   const isTeachingDay = startIndex !== -1;
-  const order = DAYS.map((_, i) => (isTeachingDay ? (startIndex + i) % DAYS.length : i));
+  const order = cycle.map((_, i) => (isTeachingDay ? (startIndex + i) % cycle.length : i));
   for (const [offset, dayIndex] of order.entries()) {
-    const day = DAYS[dayIndex];
+    const day = cycle[dayIndex];
     const candidates = rows
-      // "Later today" only applies on a teaching day; on Friday/Saturday every day ahead counts.
+      // "Later today" only applies on a day that is actually today.
       .filter((row) => row.day === day && (!isTeachingDay || offset > 0 || minutesOf(row.start_time) > nowMinutes))
       .sort((a, b) => minutesOf(a.start_time) - minutesOf(b.start_time));
     if (candidates.length) return { row: candidates[0], dayOffset: isTeachingDay ? offset : 2 };
@@ -82,8 +86,10 @@ export default function Overview({ onNavigate }) {
 
   const sources = [schedules, events, announcements, assignments];
   const loading = sources.some((s) => s.loading);
-  const fatal = sources.every((s) => s.error) ? sources[0].error : null;
-  const stale = sources.find((s) => s.staleError)?.staleError ?? null;
+  const failed = sources.filter((s) => s.error);
+  // One dead endpoint must not be rendered as "nothing due" — say so instead.
+  const fatal = failed.length === sources.length ? failed[0].error : null;
+  const stale = sources.find((s) => s.staleError)?.staleError ?? failed[0]?.error ?? null;
 
   const weekEnd = addDays(today, 7);
 
@@ -231,8 +237,8 @@ export default function Overview({ onNavigate }) {
 
         <StatTile
           icon={Door}
-          label="Rooms free for the next hour"
-          value={windowEnd ? (freeRooms.data?.length ?? "—") : "—"}
+          label={windowEnd ? "Rooms free for the next hour" : "Room availability"}
+          value={windowEnd ? (freeRooms.data?.length ?? "—") : "Check"}
           onClick={() => onNavigate("rooms")}
         />
         <StatTile

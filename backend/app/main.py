@@ -14,10 +14,10 @@ from .agents.store import purge_old
 from .config import ALLOWED_ORIGINS, CLIENT_DIST
 from .db import migrate
 from .ratelimit import rate_limit_middleware
-from .routers.api import router
+from .routers.api import public, router
 from .search.embedder import warmup_async
 from .search.indexer import reindex_all
-from .seed import seed_if_empty, seed_rbac
+from .seed import seed_if_empty, seed_users
 from .services.common import DomainError
 
 log = logging.getLogger("campusos")
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     sse.set_loop(asyncio.get_running_loop())
     migrate()
     seeded = seed_if_empty()
-    seed_rbac()
+    seed_users()
     gateway.restore()
     print(f"[startup] database ready (seeded={seeded}); agent keys: {len(gateway.keys)}")
     warmup_async()
@@ -82,6 +82,7 @@ async def unhandled_error_handler(request: Request, exc: Exception):
                                                   "detail": "Something went wrong on the server. Please try again."})
 
 
+app.include_router(public)
 app.include_router(router)
 
 

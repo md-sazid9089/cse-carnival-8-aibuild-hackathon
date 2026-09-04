@@ -24,16 +24,17 @@ export function bookingState(room) {
 }
 
 /**
- * Every window that would make a room busy on one date — bookings, timetabled
- * classes and events at that venue — merged and time-ordered so the user can
- * see *why* a slot will be refused before trying it.
+ * Everything that occupies a room: today's classes and events, plus every
+ * booking from today onwards. Future bookings are included so a student can
+ * actually find — and cancel — the slot they reserved for next week.
  */
 export function busyWindows({ room, date, weekday, schedules = [], events = [] }) {
   const windows = room.bookings
-    .filter((booking) => booking.date === date)
+    .filter((booking) => booking.date >= date)
     .map((booking) => ({
       key: booking.booking_id,
       kind: "booking",
+      date: booking.date,
       label: booking.purpose,
       by: booking.booked_by,
       start: booking.start_time,
@@ -47,6 +48,7 @@ export function busyWindows({ room, date, weekday, schedules = [], events = [] }
       windows.push({
         key: `class-${row.id}`,
         kind: "class",
+        date,
         label: `${row.course} class`,
         by: row.instructor,
         start: row.start_time,
@@ -55,11 +57,18 @@ export function busyWindows({ room, date, weekday, schedules = [], events = [] }
     );
 
   events
-    .filter((event) => event.venue === room.room_number && event.date === date && event.status !== "cancelled" && event.status !== "completed")
+    .filter(
+      (event) =>
+        event.venue === room.room_number &&
+        event.date === date &&
+        event.status !== "cancelled" &&
+        event.status !== "completed",
+    )
     .forEach((event) =>
       windows.push({
         key: `event-${event.id}`,
         kind: "event",
+        date,
         label: event.name,
         by: event.organizer,
         start: event.start_time,
@@ -67,5 +76,5 @@ export function busyWindows({ room, date, weekday, schedules = [], events = [] }
       }),
     );
 
-  return windows.sort((a, b) => minutesOf(a.start) - minutesOf(b.start));
+  return windows.sort((a, b) => a.date.localeCompare(b.date) || minutesOf(a.start) - minutesOf(b.start));
 }

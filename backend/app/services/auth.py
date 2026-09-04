@@ -6,9 +6,9 @@ import json
 import secrets
 import time
 
-from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S
-from ..db import execute, next_id, q, q1
-from .common import DomainError
+from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S, DEPARTMENT
+from ..db import execute, q, q1
+from .common import DomainError, now_local
 
 ITERATIONS = 100_000
 
@@ -87,11 +87,13 @@ def get_user_permissions(role_id: str) -> list[str]:
     return list(STUDENT_PERMISSIONS)
 
 
-def sign_up(name: str, email: str, password: str, student_id: str | None = None, department: str = "CSE") -> dict:
-    """Register a new user. Every registered user is initially given the 'student' role."""
+def sign_up(name: str, email: str, password: str, student_id: str | None = None,
+            department: str | None = None) -> dict:
+    """Register a new account. Every account is a student."""
     name = (name or "").strip()
     email = (email or "").strip().lower()
     student_id = (student_id or "").strip() or None
+    department = (department or "").strip() or DEPARTMENT
 
     if not name:
         raise DomainError("MISSING_NAME", "Full name is required")
@@ -105,33 +107,36 @@ def sign_up(name: str, email: str, password: str, student_id: str | None = None,
     if existing_email:
         raise DomainError("EMAIL_EXISTS", "An account with this email already exists", 409)
 
-    # Auto-generate student ID if not supplied for new student
+    # Self-registered accounts get an ID in this year's series, e.g. 26-10001.
+    # MAX, not COUNT: deleting an account must never hand its number to somebody else.
     if not student_id:
-        count_row = q1("SELECT COUNT(*) AS n FROM users WHERE student_id LIKE %s", ["26-%"])
-        n = count_row["n"] if count_row else 0
-        student_id = f"26-{n + 10001:05d}"
+        prefix = now_local().strftime("%y")
+        row = q1(
+            """SELECT COALESCE(MAX(NULLIF(split_part(student_id, '-', 2), '')::int), 10000) + 1 AS n
+               FROM users WHERE student_id LIKE %s""",
+            [f"{prefix}-%"],
+        )
+        student_id = f"{prefix}-{row['n']:05d}"
     else:
         existing_sid = q1("SELECT id FROM users WHERE student_id = %s", [student_id])
         if existing_sid:
             raise DomainError("STUDENT_ID_EXISTS", "An account with this student ID already exists", 409)
 
-    user_id = next_id("users", "usr")
+    # Keyed off the unique student ID so the account key is stable and collision-free.
+    user_id = f"usr-{student_id}"
     hashed = hash_password(password)
-
-    # New users are always initialized with the 'student' role
-    initial_role = "student"
 
     execute(
         """INSERT INTO users (id, role_id, student_id, name, email, department, status, password_hash)
-           VALUES (%s, %s, %s, %s, %s, %s, 'active', %s)""",
-        [user_id, initial_role, student_id, name, email, department, hashed],
+           VALUES (%s, 'student', %s, %s, %s, %s, 'active', %s)""",
+        [user_id, student_id, name, email, department, hashed],
     )
 
     user = q1(
         "SELECT id, role_id, student_id, employee_id, name, email, department, status, created_at FROM users WHERE id = %s",
         [user_id],
     )
-    user["permissions"] = get_user_permissions(initial_role)
+    user["permissions"] = get_user_permissions(user["role_id"])
     token = create_token(user)
 
     return {"token": token, "user": user}

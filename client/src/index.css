@@ -130,6 +130,7 @@
   --animate-pop: pop 0.16s var(--ease-out-soft) both;
   --animate-sheet: sheet 0.24s var(--ease-out-soft) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-beacon: beacon 2.2s var(--ease-out-soft) 3;
 }
 
 @keyframes fade-in {
@@ -151,6 +152,11 @@
 @keyframes shimmer {
   from { background-position: 200% 0 }
   to { background-position: -200% 0 }
+}
+/* A few pulses to announce the assistant launcher, then it settles down for good. */
+@keyframes beacon {
+  0% { opacity: 0.45; transform: scale(1) }
+  55%, 100% { opacity: 0; transform: scale(1.4) }
 }
 
 /* --------------------------------------------------------------------------- */
@@ -199,6 +205,13 @@
   }
   ::placeholder {
     color: var(--ink-3);
+  }
+
+  /* The custom clear button is themed and keyboard-reachable; the native one is not. */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   /* Native date/time pickers are invisible on dark surfaces without this. */

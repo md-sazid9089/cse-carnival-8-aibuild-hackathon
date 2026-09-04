@@ -20,7 +20,15 @@ def _int(name: str, default: int) -> int:
         return default
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://campusos:campusos@localhost:5433/campusos")
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Copy .env.example to .env and point it at your Postgres "
+        "(the docker-compose service, or any hosted instance with pgvector)."
+    )
 
 # --- OpenRouter (only provider). Pool of keys from separate accounts, cycled per request.
 OPENROUTER_API_KEYS = _csv("OPENROUTER_API_KEYS") or _csv("OPENROUTER_API_KEY")
@@ -45,14 +53,24 @@ AGENT_DEGRADED_MODE = os.getenv("AGENT_DEGRADED_MODE", "1") == "1"
 
 EMBEDDINGS_ENABLED = os.getenv("EMBEDDINGS_ENABLED", "1") == "1"
 TZ_NAME = os.getenv("TZ_NAME", "Asia/Dhaka")
+DEPARTMENT = os.getenv("DEPARTMENT", "CSE")
+EMAIL_DOMAIN = os.getenv("EMAIL_DOMAIN", "aust.edu").lstrip("@")
 
-# Session-token signing key. Unset = a fresh random key per process, so tokens simply
-# stop working after a restart — never a guessable constant in a public repo.
+# Session-token signing key. Outside production an unset key means a fresh random one per
+# process, so tokens stop working after a restart — never a guessable constant in a public repo.
+if IS_PRODUCTION and not os.getenv("AUTH_SECRET"):
+    raise RuntimeError("AUTH_SECRET must be set in production, otherwise every restart signs out every user.")
 AUTH_SECRET = (os.getenv("AUTH_SECRET") or secrets.token_hex(32)).encode("utf-8")
 AUTH_TOKEN_TTL_S = _int("AUTH_TOKEN_TTL_S", 12 * 3600)
-# Local dev origins plus any extra origin for a separately hosted frontend.
-ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"] + _csv("ALLOWED_ORIGINS")
-APP_URL = os.getenv("APP_URL", "http://localhost:8000")
+# Password for the accounts named in the seed data. Unset = those accounts cannot sign in
+# and everyone registers their own; a password must never be shipped in the repo.
+SEED_USER_PASSWORD = os.getenv("SEED_USER_PASSWORD", "").strip()
+
+# Origins allowed to call the API. Localhost is only assumed while developing.
+ALLOWED_ORIGINS = _csv("ALLOWED_ORIGINS")
+if not IS_PRODUCTION:
+    ALLOWED_ORIGINS += ["http://localhost:5173", "http://127.0.0.1:5173"]
+APP_URL = os.getenv("APP_URL", "").strip()
 
 DATA_DIR = ROOT / "data"
 CLIENT_DIST = ROOT / "client" / "dist"

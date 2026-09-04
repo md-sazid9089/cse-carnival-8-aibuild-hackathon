@@ -27,56 +27,62 @@ def check(name, cond, evidence=""):
 with TestClient(app) as client:
     print("=== CampusOS auth tests ===")
 
-    # 1. Seeded student account
-    seed_user = q1("SELECT * FROM users WHERE email = 'sakibul.hassan@aust.edu'")
-    check("Seed student exists", seed_user is not None, seed_user)
-    check("Seed student has a password hash", seed_user and bool(seed_user.get("password_hash")))
-    check("Seed student password verifies", seed_user and verify_password("student123", seed_user["password_hash"]))
+    # 1. Accounts derived from the seed data, with no password shipped in the repo
+    seed_user = q1("SELECT * FROM users WHERE student_id = '20-40532'")
+    check("Person named in the seed data has an account", seed_user is not None, seed_user)
     check("Every seeded account is a student", not q1("SELECT 1 AS x FROM users WHERE role_id <> 'student'"))
+    check("No password is stored in plain text",
+          not q1("SELECT 1 AS x FROM users WHERE password_hash IS NOT NULL AND password_hash NOT LIKE %s",
+                 ["pbkdf2:%"]))
 
-    # 2. Sign in
-    r = client.post("/api/auth/signin", json={"email_or_id": "sakibul.hassan@aust.edu", "password": "student123"})
-    check("POST /api/auth/signin -> 200", r.status_code == 200, r.json() if r.status_code != 200 else "ok")
-    student_token = r.json().get("token")
-    student_data = r.json().get("user", {})
-    check("Sign in returns a bearer token", bool(student_token))
-    check("Signed-in role is 'student'", student_data.get("role_id") == "student", student_data.get("role_id"))
-    check("Sign in by student ID also works",
-          client.post("/api/auth/signin", json={"email_or_id": "20-40532", "password": "student123"}).status_code == 200)
-
-    r = client.post("/api/auth/signin", json={"email_or_id": "sakibul.hassan@aust.edu", "password": "wrongpassword"})
-    check("Wrong password -> 401", r.status_code == 401, r.json())
-    r = client.post("/api/auth/signin", json={"email_or_id": "nonexistent@aust.edu", "password": "anypassword"})
-    check("Unknown account -> 401", r.status_code == 401, r.json())
-
-    # 3. Sign up
-    unique_email = f"newstudent_{int(time.time())}@aust.edu"
-    r = client.post("/api/auth/signup", json={"name": "Newly Registered Student", "email": unique_email,
-                                              "password": "mypassword123", "department": "CSE"})
+    # 2. Register, then sign in with those credentials
+    stamp = int(time.time())
+    owner_email, owner_password = f"owner_{stamp}@aust.edu", f"owner-pw-{stamp}"
+    r = client.post("/api/auth/signup", json={"name": "Owner Student", "email": owner_email,
+                                              "password": owner_password})
     check("Sign up -> 200", r.status_code == 200, r.json() if r.status_code != 200 else "ok")
-    new_user_res = r.json()
-    new_token = new_user_res.get("token")
-    new_user = new_user_res.get("user", {})
-    check("New account is a student", new_user.get("role_id") == "student", new_user.get("role_id"))
-    check("New account gets a student ID", bool(new_user.get("student_id")), new_user.get("student_id"))
+    owner = r.json().get("user", {})
+    owner_token = r.json().get("token")
+    check("New account is a student", owner.get("role_id") == "student", owner.get("role_id"))
+    check("New account gets a student ID", bool(owner.get("student_id")), owner.get("student_id"))
 
-    db_new_user = q1("SELECT * FROM users WHERE email = %s", [unique_email])
+    db_owner = q1("SELECT * FROM users WHERE email = %s", [owner_email])
     check("Password is stored hashed, never in the clear",
-          db_new_user and db_new_user["password_hash"].startswith("pbkdf2:sha256:"))
-    check("Stored hash verifies", db_new_user and verify_password("mypassword123", db_new_user["password_hash"]))
+          db_owner and db_owner["password_hash"].startswith("pbkdf2:sha256:"))
+    check("Stored hash verifies", db_owner and verify_password(owner_password, db_owner["password_hash"]))
     check("Short password -> 400",
           client.post("/api/auth/signup",
-                      json={"name": "X", "email": f"x{unique_email}", "password": "123"}).status_code == 400)
-    r_dup = client.post("/api/auth/signup", json={"name": "Duplicate Student", "email": unique_email,
-                                                  "password": "mypassword123"})
+                      json={"name": "X", "email": f"x{owner_email}", "password": "123"}).status_code == 400)
+    r_dup = client.post("/api/auth/signup", json={"name": "Duplicate", "email": owner_email,
+                                                  "password": owner_password})
     check("Duplicate email -> 409", r_dup.status_code == 409, r_dup.json())
 
-    # 4. Token handling
+    r = client.post("/api/auth/signin", json={"email_or_id": owner_email, "password": owner_password})
+    check("POST /api/auth/signin -> 200", r.status_code == 200, r.json() if r.status_code != 200 else "ok")
+    check("Sign in returns a bearer token", bool(r.json().get("token")))
+    check("Sign in by student ID also works",
+          client.post("/api/auth/signin",
+                      json={"email_or_id": owner["student_id"], "password": owner_password}).status_code == 200)
+    check("Wrong password -> 401",
+          client.post("/api/auth/signin", json={"email_or_id": owner_email, "password": "wrong"}).status_code == 401)
+    check("Unknown account -> 401",
+          client.post("/api/auth/signin", json={"email_or_id": "nobody@aust.edu", "password": "x"}).status_code == 401)
+
+    # A second account so ownership can be tested from the other side
+    other_email, other_password = f"other_{stamp}@aust.edu", f"other-pw-{stamp}"
+    r = client.post("/api/auth/signup", json={"name": "Other Student", "email": other_email,
+                                              "password": other_password})
+    other_token = r.json().get("token")
+    student_token, new_token, new_user, unique_email = other_token, owner_token, owner, owner_email
+
+    # 3. The API refuses anything it did not sign
+    check("No token -> 401", client.get("/api/schedules").status_code == 401)
+    check("Forged token -> 401",
+          client.get("/api/schedules", headers={"Authorization": "Bearer forged.signature"}).status_code == 401)
+    check("Public endpoints stay reachable", client.get("/api/meta").status_code == 200)
     r_me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"})
     check("GET /api/auth/me returns the token's own profile",
           r_me.status_code == 200 and r_me.json().get("email") == unique_email, r_me.json())
-    forged = client.get("/api/auth/me", headers={"Authorization": "Bearer eyJ1aWQiOiJ1c3ItMDAxIn0.deadbeefdeadbeef"})
-    check("Forged token grants no identity", forged.json().get("email") != "sakibul.hassan@aust.edu", forged.json())
 
     # 5. Ownership: only the person who booked may cancel
     r_book = client.post("/api/rooms/room-002/bookings",
@@ -107,7 +113,7 @@ with TestClient(app) as client:
                                 headers={"Authorization": f"Bearer {new_token}"})
     check("The owner can cancel their registration -> 200", r_unreg_own.status_code == 200, r_unreg_own.json())
 
-    execute("DELETE FROM users WHERE email = %s", [unique_email])
+    execute("DELETE FROM users WHERE email IN (%s, %s)", [owner_email, other_email])
 
 print("\n" + "=" * 60)
 w = max(len(n) for n, _, _ in results)

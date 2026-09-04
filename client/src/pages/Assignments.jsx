@@ -42,7 +42,7 @@ function AssignmentRow({ assignment, today, onEdit, onDelete, onSubmit, busy }) 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">{assignment.course}</Badge>
-          <h3 className="text-sm font-medium text-ink">{assignment.title}</h3>
+          <h2 className="text-sm font-medium text-ink">{assignment.title}</h2>
           <StatusBadge value={assignment.status} />
         </div>
         <p className="mt-1 line-clamp-1 text-[13px] text-ink-3">{assignment.description}</p>

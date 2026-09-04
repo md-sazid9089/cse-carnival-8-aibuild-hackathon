@@ -37,15 +37,20 @@ export function useFocusTrap({ active, containerRef, onClose, initialFocusRef, l
     const focusables = () =>
       Array.from(container?.querySelectorAll(FOCUSABLE) ?? []).filter((el) => el.offsetParent !== null);
 
-    // Wait a frame so the entrance animation does not fight scroll-into-view.
+    const focusTarget = () => initialRef.current?.current ?? focusables()[0] ?? container;
+    // Focus immediately so it works even when rAF is throttled (background tab),
+    // then once more after the entrance animation settles the layout.
+    focusTarget()?.focus({ preventScroll: true });
     const raf = requestAnimationFrame(() => {
-      const target = initialRef.current?.current ?? focusables()[0] ?? container;
-      target?.focus({ preventScroll: true });
+      if (!container?.contains(document.activeElement)) focusTarget()?.focus({ preventScroll: true });
     });
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
-        event.stopPropagation();
+        // A native select swallows Escape to close its own popup; dismissing the
+        // dialog too would silently discard the form.
+        if (event.target?.tagName === "SELECT") return;
+        event.stopImmediatePropagation();
         closeRef.current?.();
         return;
       }
@@ -72,7 +77,10 @@ export function useFocusTrap({ active, containerRef, onClose, initialFocusRef, l
       cancelAnimationFrame(raf);
       document.removeEventListener("keydown", onKeyDown, true);
       unlock();
-      restoreTo?.focus?.({ preventScroll: true });
+      // The trigger may be gone (the row it lived in was just deleted); falling
+      // back to <main> keeps the user somewhere sensible instead of <body>.
+      const target = restoreTo && document.contains(restoreTo) ? restoreTo : document.getElementById("main");
+      target?.focus?.({ preventScroll: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, lockScroll]);

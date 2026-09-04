@@ -1,7 +1,8 @@
-"""Load seed JSON into Postgres on first boot and manage RBAC seeds. Repo JSON files are never mutated."""
+"""Load seed JSON into Postgres on first boot. Repo JSON files are never mutated."""
 import json
+import re
 
-from .config import DATA_DIR
+from .config import DATA_DIR, DEPARTMENT, EMAIL_DOMAIN, SEED_USER_PASSWORD
 from .db import pool, q1
 from .search.indexer import build_content, reindex_all
 
@@ -65,80 +66,54 @@ def link_identities() -> None:
         )
 
 
-def seed_rbac() -> bool:
-    """Seed the permission catalogue and the demo student accounts idempotently.
+def _people_from_data() -> list[tuple[str, str]]:
+    """Every (student_id, name) the seed data names as an event registrant.
 
-    Migration 004 dropped `roles`/`role_permissions`: every account is a student.
+    Accounts are derived from the dataset rather than listed here, so editing
+    data/events.json is the only place a person is introduced.
     """
-    permissions = [
-        # schedules
-        ("schedules:view", "View Schedules", "schedules", "View class routines and timetables"),
-        ("schedules:manage", "Manage Schedules", "schedules", "Create, edit, or delete class schedule slots"),
-        # rooms
-        ("rooms:view", "View Rooms", "rooms", "Browse rooms, equipment, capacity, and current bookings"),
-        ("rooms:book", "Book Room", "rooms", "Book a free room for study, lab, or class session"),
-        ("rooms:cancel_own", "Cancel Own Booking", "rooms", "Cancel reservations booked by oneself"),
-        ("rooms:manage", "Manage Rooms", "rooms", "Add, edit, or remove rooms and configure equipment"),
-        ("rooms:override_bookings", "Override Bookings", "rooms", "Cancel or reassign any room reservation"),
-        # events
-        ("events:view", "View Events", "events", "Browse campus events, workshops, and seminars"),
-        ("events:register", "Register for Event", "events", "Register for an open campus event"),
-        ("events:cancel_own", "Cancel Event Registration", "events", "Cancel one's own event registration"),
-        ("events:manage", "Manage Events", "events", "Create, edit, cancel, or delete campus events"),
-        # announcements
-        ("announcements:view", "View Announcements", "announcements", "Read notices and departmental announcements"),
-        ("announcements:create", "Create Announcements", "announcements", "Post notices, rescheduling updates, or alerts"),
-        ("announcements:manage", "Manage Announcements", "announcements", "Edit or take down existing announcements"),
-        # assignments
-        ("assignments:view", "View Assignments", "assignments", "View course assignments, tasks, and deadlines"),
-        ("assignments:submit", "Submit Assignment", "assignments", "Submit solutions or assignments before deadlines"),
-        ("assignments:manage", "Manage Assignments", "assignments", "Create, update, or delete assignments and set marks"),
-        ("assignments:grade", "Grade Assignments", "assignments", "Review and grade student submissions"),
-        # system
-        ("users:manage", "Manage Users", "system", "Manage user profiles and roles"),
-        ("logs:view", "View Activity Logs", "system", "Inspect system audit logs and activity trail"),
-    ]
+    people: dict[str, str] = {}
+    for event in _load("events.json"):
+        for reg in event.get("registrations", []):
+            sid = str(reg.get("student_id", "")).strip()
+            name = str(reg.get("name", "")).strip()
+            if sid and name:
+                people.setdefault(sid, name)
+    return sorted(people.items())
 
+
+def _email_for(name: str) -> str:
+    parts = [p for p in re.split(r"[^A-Za-z]+", name.lower()) if p]
+    return f"{'.'.join(parts) or 'student'}@{EMAIL_DOMAIN}"
+
+
+def seed_users() -> None:
+    """Give the people named in the seed data an account, idempotently.
+
+    They can only sign in when SEED_USER_PASSWORD is configured; with no password set
+    the accounts exist purely so their bookings and registrations have an owner, and
+    everyone else registers through /api/auth/signup.
+    """
     from .services.auth import hash_password
 
-    users = [
-        # (id, role_id, student_id, employee_id, name, email, department, status, password)
-        ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active", "student123"),
-        ("usr-002", "student", "99-00001", None, "QA Tester", "qa.tester@aust.edu", "CSE", "active", "student123"),
-        ("usr-003", "student", "20-40533", None, "Tanvir Ahmed", "tanvir.ahmed@aust.edu", "CSE", "active", "student123"),
-    ]
+    pw_hash = hash_password(SEED_USER_PASSWORD) if SEED_USER_PASSWORD else None
 
     with pool.connection() as conn:
-        for p_id, p_name, p_cat, p_desc in permissions:
+        for student_id, name in _people_from_data():
             conn.execute(
-                """INSERT INTO permissions (id, name, category, description)
-                   VALUES (%s, %s, %s, %s)
-                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category, description = EXCLUDED.description""",
-                [p_id, p_name, p_cat, p_desc],
-            )
-
-        for u_id, role_id, student_id, employee_id, name, email, dept, status, plain_pw in users:
-            pw_hash = hash_password(plain_pw)
-            conn.execute(
-                """INSERT INTO users (id, role_id, student_id, employee_id, name, email, department, status, password_hash)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                   ON CONFLICT (id) DO UPDATE SET
+                """INSERT INTO users (id, role_id, student_id, name, email, department, status, password_hash)
+                   VALUES (%s, 'student', %s, %s, %s, %s, 'active', %s)
+                   ON CONFLICT (student_id) DO UPDATE SET
                        name = EXCLUDED.name,
-                       email = EXCLUDED.email,
-                       role_id = EXCLUDED.role_id,
-                       student_id = EXCLUDED.student_id,
-                       employee_id = EXCLUDED.employee_id,
-                       department = EXCLUDED.department,
                        status = EXCLUDED.status,
-                       password_hash = EXCLUDED.password_hash""",
-                [u_id, role_id, student_id, employee_id, name, email, dept, status, pw_hash],
+                       password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)""",
+                [f"usr-{student_id}", student_id, name, _email_for(name), DEPARTMENT, pw_hash],
             )
     link_identities()
-    return True
 
 
 def seed_if_empty() -> bool:
-    seed_rbac()
+    seed_users()
 
     if q1("SELECT COUNT(*) AS n FROM schedules")["n"] > 0:
         return False
