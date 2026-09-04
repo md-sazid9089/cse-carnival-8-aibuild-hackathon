@@ -2,7 +2,8 @@ import psycopg.errors
 
 from .. import sse
 from ..db import execute, next_id, pool, q, q1, ser_row
-from .common import DomainError, check_date, check_enum, check_time, check_time_order, require, weekday_name
+from .common import (DomainError, check_date, check_enum, check_time, check_time_order, require, to_int,
+                     to_str_list, weekday_name)
 
 FIELDS = ["room_number", "type", "capacity", "equipment", "floor", "status"]
 TYPES = ["classroom", "lab", "seminar"]
@@ -45,26 +46,37 @@ def get_room_by_number(room_number: str) -> dict:
     return row
 
 
+def _normalize(data: dict) -> dict:
+    check_enum(data["type"], TYPES, "type")
+    check_enum(data["status"], STATUSES, "status")
+    return {
+        "room_number": str(data["room_number"]).strip(),
+        "type": data["type"],
+        "capacity": to_int(data["capacity"], "capacity", minimum=1),
+        "equipment": to_str_list(data["equipment"], "equipment"),
+        "floor": to_int(data["floor"], "floor", minimum=0),
+        "status": data["status"],
+    }
+
+
 def create_room(data: dict) -> dict:
     require(data, FIELDS[:-1])  # status defaults to available
-    check_enum(data["type"], TYPES, "type")
     data.setdefault("status", "available")
-    check_enum(data["status"], STATUSES, "status")
+    n = _normalize(data)
+    if q1("SELECT 1 FROM rooms WHERE room_number = %s", [n["room_number"]]):
+        raise DomainError("DUPLICATE", f"Room {n['room_number']} already exists", 409)
     rid = next_id("rooms", "room")
     execute("INSERT INTO rooms VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            [rid, data["room_number"], data["type"], int(data["capacity"]), list(data["equipment"]),
-             int(data["floor"]), data["status"]])
+            [rid, n["room_number"], n["type"], n["capacity"], n["equipment"], n["floor"], n["status"]])
     sse.publish("rooms", "create", rid)
     return get_room(rid)
 
 
 def update_room(rid: str, data: dict) -> dict:
     merged = {**get_room(rid), **{k: v for k, v in data.items() if k in FIELDS}}
-    check_enum(merged["type"], TYPES, "type")
-    check_enum(merged["status"], STATUSES, "status")
+    n = _normalize(merged)
     execute("UPDATE rooms SET room_number=%s,type=%s,capacity=%s,equipment=%s,floor=%s,status=%s WHERE id=%s",
-            [merged["room_number"], merged["type"], int(merged["capacity"]), list(merged["equipment"]),
-             int(merged["floor"]), merged["status"], rid])
+            [n["room_number"], n["type"], n["capacity"], n["equipment"], n["floor"], n["status"], rid])
     sse.publish("rooms", "update", rid)
     return get_room(rid)
 

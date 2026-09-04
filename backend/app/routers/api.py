@@ -1,18 +1,32 @@
 """All REST routes. Thin controllers — every rule lives in services."""
-from fastapi import APIRouter, Body, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, Body, Header, Request
+from fastapi.responses import StreamingResponse
 
 from .. import sse
 from ..agents.orchestrator import handle_chat
+from ..config import TZ_NAME
 from ..search.hybrid import hybrid_search
 from ..services import announcements, assignments, events, rooms, schedules
 from ..services.common import DomainError
 
 router = APIRouter(prefix="/api")
 
+DEFAULT_PROFILE = {"student_id": "20-40532", "name": "Sakibul Hassan"}
 
-def _err(e: DomainError) -> JSONResponse:
-    return JSONResponse(status_code=e.status, content={"error": e.reason, "detail": e.detail})
+
+def _identity(x_student_id: str | None, x_student_name: str | None) -> dict:
+    """Acting profile. Single-user app: identity is asserted by the client (profile switcher), not authenticated."""
+    return {"student_id": x_student_id or DEFAULT_PROFILE["student_id"],
+            "name": x_student_name or DEFAULT_PROFILE["name"]}
+
+
+@router.get("/meta")
+def meta():
+    now = datetime.now(ZoneInfo(TZ_NAME))
+    return {"now": now.isoformat(), "today": now.date().isoformat(), "weekday": now.strftime("%A"), "tz": TZ_NAME}
 
 
 # ---- schedules ----
@@ -60,15 +74,17 @@ def rooms_delete(rid: str):
 
 
 @router.post("/rooms/{rid}/bookings")
-def booking_create(rid: str, data: dict = Body(...)):
+def booking_create(rid: str, data: dict = Body(...),
+                   x_student_id: str | None = Header(default=None), x_student_name: str | None = Header(default=None)):
     room = rooms.get_room(rid)
-    booked_by = data.pop("booked_by", None) or "Dashboard User"
-    return rooms.add_booking(room["room_number"], data, booked_by)
+    data.pop("booked_by", None)
+    return rooms.add_booking(room["room_number"], data, _identity(x_student_id, x_student_name)["name"])
 
 
 @router.delete("/rooms/{rid}/bookings/{booking_id}")
-def booking_cancel(rid: str, booking_id: str, booked_by: str | None = None):
-    return rooms.cancel_booking(booking_id, requested_by=booked_by or "Dashboard User")
+def booking_cancel(rid: str, booking_id: str,
+                   x_student_id: str | None = Header(default=None), x_student_name: str | None = Header(default=None)):
+    return rooms.cancel_booking(booking_id, requested_by=_identity(x_student_id, x_student_name)["name"])
 
 
 # ---- events + registrations ----
@@ -94,12 +110,18 @@ def events_delete(eid: str):
 
 
 @router.post("/events/{eid}/registrations")
-def registration_create(eid: str, data: dict = Body(...)):
-    return events.register(eid, data["student_id"], data["name"])
+def registration_create(eid: str, x_student_id: str | None = Header(default=None),
+                        x_student_name: str | None = Header(default=None)):
+    who = _identity(x_student_id, x_student_name)
+    return events.register(eid, who["student_id"], who["name"])
 
 
 @router.delete("/events/{eid}/registrations/{student_id}")
-def registration_cancel(eid: str, student_id: str):
+def registration_cancel(eid: str, student_id: str, x_student_id: str | None = Header(default=None),
+                        x_student_name: str | None = Header(default=None)):
+    who = _identity(x_student_id, x_student_name)
+    if who["student_id"] != student_id:
+        raise DomainError("FORBIDDEN", "You can only cancel your own registration", 403)
     return events.cancel_registration(eid, student_id)
 
 
@@ -154,10 +176,13 @@ def search(q: str):
 
 
 @router.post("/agent/chat")
-def agent_chat(payload: dict = Body(...)):
-    history = payload.get("messages", [])
-    profile = payload.get("profile") or {"student_id": "20-40532", "name": "Sakibul Hassan"}
-    return handle_chat(history, profile)
+def agent_chat(payload: dict = Body(...), x_student_id: str | None = Header(default=None),
+               x_student_name: str | None = Header(default=None)):
+    history = [m for m in payload.get("messages", []) if m.get("role") in ("user", "assistant") and m.get("content")]
+    if not history:
+        raise DomainError("MISSING_FIELDS", "messages must contain at least one user message")
+    profile = payload.get("profile") or _identity(x_student_id, x_student_name)
+    return handle_chat(history[-20:], profile)
 
 
 @router.get("/stream")

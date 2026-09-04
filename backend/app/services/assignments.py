@@ -1,7 +1,7 @@
 from .. import sse
 from ..db import execute, next_id, q, q1
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, require
+from .common import DomainError, check_date, check_enum, require, to_int
 
 FIELDS = ["course", "course_title", "title", "description", "assigned_date", "deadline",
           "submission_platform", "status", "marks"]
@@ -30,6 +30,9 @@ def _validate(data: dict) -> None:
     check_date(data["assigned_date"], "assigned_date")
     check_date(data["deadline"], "deadline")
     check_enum(data["status"], STATUSES, "status")
+    data["marks"] = to_int(data["marks"], "marks", minimum=0)
+    if str(data["deadline"]) < str(data["assigned_date"]):
+        raise DomainError("INVALID_DATE", "deadline must not be before assigned_date")
 
 
 def create_assignment(data: dict) -> dict:
@@ -38,7 +41,7 @@ def create_assignment(data: dict) -> dict:
     _validate(data)
     aid = next_id("assignments", "asgn")
     execute("INSERT INTO assignments VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-            [aid] + [data[f] if f != "marks" else int(data[f]) for f in FIELDS])
+            [aid] + [data[f] for f in FIELDS])
     rec = get_assignment(aid)
     reindex("assignment", rec)
     sse.publish("assignments", "create", aid)
@@ -51,7 +54,7 @@ def update_assignment(aid: str, data: dict) -> dict:
     execute(
         """UPDATE assignments SET course=%s,course_title=%s,title=%s,description=%s,assigned_date=%s,
            deadline=%s,submission_platform=%s,status=%s,marks=%s WHERE id=%s""",
-        [merged[f] if f != "marks" else int(merged[f]) for f in FIELDS] + [aid])
+        [merged[f] for f in FIELDS] + [aid])
     rec = get_assignment(aid)
     reindex("assignment", rec)
     sse.publish("assignments", "update", aid)

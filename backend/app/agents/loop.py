@@ -18,10 +18,14 @@ def run_loop(model: str, system_prompt: str, history: list[dict], tools: list[di
             messages.append(msg)
             for call in tool_calls:
                 name = call["function"]["name"]
-                try:
-                    args = json.loads(call["function"].get("arguments") or "{}")
-                except json.JSONDecodeError:
-                    args = {}
+                raw = call["function"].get("arguments") or "{}"
+                if isinstance(raw, dict):
+                    args = raw
+                else:
+                    try:
+                        args = json.loads(raw)
+                    except json.JSONDecodeError:
+                        args = {}
                 result = dispatch(name, args, profile)
                 trace.append({"tool": name, "args": args, "ok": result.get("ok", False)})
                 messages.append({"role": "tool", "tool_call_id": call["id"], "name": name,

@@ -3,7 +3,7 @@ from psycopg.rows import dict_row
 from .. import sse
 from ..db import execute, next_id, pool, q, q1, ser_row
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, check_time, check_time_order, require
+from .common import DomainError, check_date, check_enum, check_time, check_time_order, require, to_int
 
 FIELDS = ["name", "description", "date", "start_time", "end_time", "end_date", "venue", "organizer", "capacity", "status"]
 STATUSES = ["upcoming", "ongoing", "completed", "cancelled", "full"]
@@ -41,17 +41,25 @@ def _validate(data: dict) -> None:
     check_time(data["start_time"], "start_time")
     check_time(data["end_time"], "end_time")
     check_enum(data["status"], STATUSES, "status")
+    data["capacity"] = to_int(data["capacity"], "capacity", minimum=1)
+    if str(data["end_date"]) < str(data["date"]):
+        raise DomainError("INVALID_DATE", "end_date must not be before date")
+    if str(data["end_date"]) == str(data["date"]):
+        check_time_order(data["start_time"], data["end_time"])
+    if int(data.get("registered", 0)) > data["capacity"]:
+        raise DomainError("INVALID_NUMBER", f"capacity ({data['capacity']}) cannot be below current registrations ({data['registered']})", 409)
 
 
 def create_event(data: dict) -> dict:
     data.setdefault("status", "upcoming")
-    data.setdefault("end_date", data.get("date"))
+    if not data.get("end_date"):
+        data["end_date"] = data.get("date")
     require(data, [f for f in FIELDS if f != "status"])
     _validate(data)
     eid = next_id("events", "evt")
     execute("INSERT INTO events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,%s)",
             [eid, data["name"], data["description"], data["date"], data["start_time"], data["end_time"],
-             data["end_date"], data["venue"], data["organizer"], int(data["capacity"]), data["status"]])
+             data["end_date"], data["venue"], data["organizer"], data["capacity"], data["status"]])
     rec = get_event(eid)
     reindex("event", rec)
     sse.publish("events", "create", eid)
@@ -65,7 +73,7 @@ def update_event(eid: str, data: dict) -> dict:
         """UPDATE events SET name=%s,description=%s,date=%s,start_time=%s,end_time=%s,end_date=%s,
            venue=%s,organizer=%s,capacity=%s,status=%s WHERE id=%s""",
         [merged["name"], merged["description"], merged["date"], merged["start_time"], merged["end_time"],
-         merged["end_date"], merged["venue"], merged["organizer"], int(merged["capacity"]), merged["status"], eid])
+         merged["end_date"], merged["venue"], merged["organizer"], merged["capacity"], merged["status"], eid])
     rec = get_event(eid)
     reindex("event", rec)
     sse.publish("events", "update", eid)

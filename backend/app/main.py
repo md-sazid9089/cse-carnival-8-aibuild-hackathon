@@ -1,6 +1,8 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
+import psycopg.errors
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,6 +16,8 @@ from .search.embedder import warmup_async
 from .search.indexer import reindex_all
 from .seed import seed_if_empty
 from .services.common import DomainError
+
+log = logging.getLogger("campusos")
 
 
 @asynccontextmanager
@@ -40,6 +44,20 @@ app.add_middleware(
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError):
     return JSONResponse(status_code=exc.status, content={"error": exc.reason, "detail": exc.detail})
+
+
+@app.exception_handler(psycopg.errors.IntegrityError)
+async def integrity_error_handler(request: Request, exc: psycopg.errors.IntegrityError):
+    # DB constraints are the last line of defense; surface them as clean 409s
+    return JSONResponse(status_code=409, content={"error": "CONSTRAINT_VIOLATION",
+                                                  "detail": (exc.diag.message_primary or str(exc)).split("\n")[0]})
+
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(request: Request, exc: Exception):
+    log.exception("unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"error": "INTERNAL_ERROR",
+                                                  "detail": "Something went wrong on the server. Please try again."})
 
 
 app.include_router(router)
