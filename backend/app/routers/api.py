@@ -115,8 +115,8 @@ def auth_users(authorization: str | None = Header(default=None)):
 
 # ---- schedules ----
 @router.get("/schedules")
-def schedules_list(day: str | None = None, course: str | None = None):
-    return schedules.list_schedules(day, course)
+def schedules_list(day: str | None = None, course: str | None = None, instructor: str | None = None):
+    return schedules.list_schedules(day, course, instructor)
 
 
 @router.post("/schedules")

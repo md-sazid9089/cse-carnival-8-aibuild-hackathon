@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Badge, Button, Card, CardHeader, EmptyState, Meter, Skeleton, StatusBadge } from "../components/ui.jsx";
-import { ErrorState, LiveDot } from "../components/page.jsx";
+import { ErrorState, LiveDot, StaleNotice } from "../components/page.jsx";
+import { DAYS } from "../entities.jsx";
 import { useApi, useSSE } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { addDays, cx, fmtLongDate, fmtTime, fmtTimeRange, minutesOf, relativeDay } from "../lib/format.js";
@@ -13,6 +14,23 @@ const greeting = (time) => {
   return "Good evening";
 };
 
+/** First class at or after now in the Sun–Thu cycle, so the card still answers
+ *  "what's next?" late in the evening or on a weekend. */
+function findNextClass(rows, weekday, nowMinutes) {
+  const startIndex = DAYS.indexOf(weekday);
+  const isTeachingDay = startIndex !== -1;
+  const order = DAYS.map((_, i) => (isTeachingDay ? (startIndex + i) % DAYS.length : i));
+  for (const [offset, dayIndex] of order.entries()) {
+    const day = DAYS[dayIndex];
+    const candidates = rows
+      // "Later today" only applies on a teaching day; on Friday/Saturday every day ahead counts.
+      .filter((row) => row.day === day && (!isTeachingDay || offset > 0 || minutesOf(row.start_time) > nowMinutes))
+      .sort((a, b) => minutesOf(a.start_time) - minutesOf(b.start_time));
+    if (candidates.length) return { row: candidates[0], dayOffset: isTeachingDay ? offset : 2 };
+  }
+  return null;
+}
+
 function Row({ children, className = "" }) {
   return <li className={cx("flex items-center gap-3 border-b border-line py-2.5 last:border-0", className)}>{children}</li>;
 }
@@ -22,7 +40,7 @@ function StatTile({ icon: Icon, label, value, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 text-left shadow-xs transition-[box-shadow,border-color] duration-200 hover:border-line-strong hover:shadow-sm"
+      className="group flex h-full items-center gap-3 self-start rounded-xl border border-line bg-surface px-3.5 py-3 text-left shadow-xs transition-[box-shadow,border-color] duration-200 hover:border-line-strong hover:shadow-sm"
     >
       <span className="grid size-9 place-items-center rounded-lg bg-surface-3 text-ink-2">
         <Icon size={17} />
@@ -37,27 +55,36 @@ function StatTile({ icon: Icon, label, value, onClick }) {
 }
 
 export default function Overview({ onNavigate }) {
-  const { today, weekday, nowTime, profile, timezone } = useCampus();
+  const { today, weekday, nowTime, profile, isTeacher, timezone } = useCampus();
 
-  const schedules = useApi("/api/schedules");
+  const schedules = useApi(isTeacher ? `/api/schedules?instructor=${encodeURIComponent(profile.name)}` : "/api/schedules");
   const events = useApi("/api/events");
   const announcements = useApi("/api/announcements?include_expired=false");
   const assignments = useApi("/api/assignments");
-  const rooms = useApi("/api/rooms");
+
+  const nowMinutes = minutesOf(nowTime);
+  // "Free right now" is a server rule (it also weighs events) — never re-derive it here.
+  const windowEnd =
+    nowMinutes >= 23 * 60 ? null : `${String(Number(nowTime.slice(0, 2)) + 1).padStart(2, "0")}:${nowTime.slice(3, 5)}`;
+  const freeRooms = useApi(
+    windowEnd ? `/api/rooms/free?date=${today}&start_time=${nowTime}&end_time=${windowEnd}` : "/api/rooms",
+    { enabled: Boolean(windowEnd) },
+  );
 
   const refreshAll = () => {
     schedules.refresh();
     events.refresh();
     announcements.refresh();
     assignments.refresh();
-    rooms.refresh();
+    freeRooms.refresh();
   };
   useSSE(null, refreshAll);
 
-  const loading = schedules.loading || events.loading || announcements.loading || assignments.loading || rooms.loading;
-  const error = schedules.error || events.error || announcements.error || assignments.error || rooms.error;
+  const sources = [schedules, events, announcements, assignments];
+  const loading = sources.some((s) => s.loading);
+  const fatal = sources.every((s) => s.error) ? sources[0].error : null;
+  const stale = sources.find((s) => s.staleError)?.staleError ?? null;
 
-  const nowMinutes = minutesOf(nowTime);
   const weekEnd = addDays(today, 7);
 
   const todaysClasses = useMemo(
@@ -71,13 +98,18 @@ export default function Overview({ onNavigate }) {
   const currentClass = todaysClasses.find(
     (row) => nowMinutes >= minutesOf(row.start_time) && nowMinutes < minutesOf(row.end_time),
   );
-  const nextClass = todaysClasses.find((row) => minutesOf(row.start_time) > nowMinutes);
+  const upNext = useMemo(
+    () => (currentClass ? null : findNextClass(schedules.data ?? [], weekday, nowMinutes)),
+    [schedules.data, weekday, nowMinutes, currentClass],
+  );
+  const nextClass = upNext?.row ?? null;
+  const featured = currentClass ?? nextClass;
 
   const dueSoon = useMemo(
     () =>
       (assignments.data ?? [])
-        .filter((row) => row.status === "pending" && row.deadline <= weekEnd)
-        .sort((a, b) => a.deadline.localeCompare(b.deadline)),
+        .filter((row) => row.status === "pending" && row.deadline && row.deadline <= weekEnd)
+        .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline))),
     [assignments.data, weekEnd],
   );
 
@@ -85,7 +117,7 @@ export default function Overview({ onNavigate }) {
     () =>
       (announcements.data ?? [])
         .filter((row) => row.priority === "high")
-        .sort((a, b) => b.date.localeCompare(a.date)),
+        .sort((a, b) => String(b.date).localeCompare(String(a.date))),
     [announcements.data],
   );
 
@@ -93,34 +125,18 @@ export default function Overview({ onNavigate }) {
     () =>
       (events.data ?? [])
         .filter((row) => row.date >= today && row.status !== "cancelled" && row.status !== "completed")
-        .sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time))
+        .sort(
+          (a, b) =>
+            String(a.date).localeCompare(String(b.date)) || String(a.start_time).localeCompare(String(b.start_time)),
+        )
         .slice(0, 4),
     [events.data, today],
   );
 
-  const freeNow = useMemo(() => {
-    const list = rooms.data ?? [];
-    return list.filter((room) => {
-      if (room.status !== "available") return false;
-      const busyBooking = room.bookings.some(
-        (booking) =>
-          booking.date === today && minutesOf(booking.start_time) <= nowMinutes && nowMinutes < minutesOf(booking.end_time),
-      );
-      if (busyBooking) return false;
-      return !(schedules.data ?? []).some(
-        (row) =>
-          row.room === room.room_number &&
-          row.day === weekday &&
-          minutesOf(row.start_time) <= nowMinutes &&
-          nowMinutes < minutesOf(row.end_time),
-      );
-    }).length;
-  }, [rooms.data, schedules.data, today, weekday, nowMinutes]);
-
-  if (error) {
+  if (fatal) {
     return (
       <div className="animate-fade-in">
-        <ErrorState message={error} onRetry={refreshAll} />
+        <ErrorState message={fatal} onRetry={refreshAll} />
       </div>
     );
   }
@@ -130,11 +146,13 @@ export default function Overview({ onNavigate }) {
       <div className="animate-fade-in space-y-4">
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-40 rounded-xl xl:col-span-2" />
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl md:col-span-2" />
-          <Skeleton className="h-64 rounded-xl md:col-span-2" />
+          <Skeleton className="h-44 rounded-xl md:col-span-2" />
+          <Skeleton className="h-16 self-start rounded-xl" />
+          <Skeleton className="h-16 self-start rounded-xl" />
+          <Skeleton className="h-16 self-start rounded-xl" />
+          <Skeleton className="h-16 self-start rounded-xl" />
+          <Skeleton className="h-56 rounded-xl md:col-span-2" />
+          <Skeleton className="h-56 rounded-xl md:col-span-2" />
         </div>
       </div>
     );
@@ -148,56 +166,53 @@ export default function Overview({ onNavigate }) {
             {greeting(nowTime)}, {profile.name.split(" ")[0]}
           </h1>
           <p className="mt-1.5 text-sm text-ink-3">
-            {fmtLongDate(today)} · {fmtTime(`${nowTime}:00`)}{" "}
-            <span className="text-ink-3/70">({timezone})</span>
+            {fmtLongDate(today)} · {fmtTime(`${nowTime}:00`)} <span>({timezone})</span>
           </p>
         </div>
         <LiveDot active={schedules.refreshing} />
       </header>
+
+      <StaleNotice message={stale} onRetry={refreshAll} />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {/* Next up — the one thing a student opens this app for. */}
         <Card className="flex flex-col justify-between p-5 md:col-span-2">
           <div>
             <p className="text-[13px] font-semibold tracking-wide text-ink-3 uppercase">
-              {currentClass ? "Happening now" : nextClass ? "Next class" : "Classes today"}
+              {currentClass ? "Happening now" : nextClass ? "Next class" : "Classes"}
             </p>
-            {currentClass || nextClass ? (
+            {featured ? (
               <div className="mt-3">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h2 className="text-2xl font-semibold tracking-tight text-ink">
-                    {(currentClass ?? nextClass).course}
-                  </h2>
-                  <p className="text-sm text-ink-2">{(currentClass ?? nextClass).title}</p>
+                  <h2 className="text-2xl font-semibold tracking-tight text-ink">{featured.course}</h2>
+                  <p className="text-sm text-ink-2">{featured.title}</p>
                 </div>
                 <dl className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-2">
                   <div className="flex items-center gap-1.5 tabular">
                     <Clock size={15} className="text-ink-3" />
                     <dt className="sr-only">Time</dt>
-                    <dd>{fmtTimeRange((currentClass ?? nextClass).start_time, (currentClass ?? nextClass).end_time)}</dd>
+                    <dd>{fmtTimeRange(featured.start_time, featured.end_time)}</dd>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Pin size={15} className="text-ink-3" />
                     <dt className="sr-only">Room</dt>
-                    <dd>Room {(currentClass ?? nextClass).room}</dd>
+                    <dd>Room {featured.room}</dd>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <dt className="sr-only">Instructor</dt>
-                    <dd className="text-ink-3">{(currentClass ?? nextClass).instructor}</dd>
+                    <dd className="text-ink-3">{featured.instructor}</dd>
                   </div>
                 </dl>
-                {!currentClass && nextClass ? (
+                {nextClass ? (
                   <p className="mt-3 inline-flex items-center rounded-md bg-accent-soft px-2 py-1 text-[13px] font-medium text-accent-ink tabular">
-                    Starts in {Math.max(0, minutesOf(nextClass.start_time) - nowMinutes)} min
+                    {upNext.dayOffset === 0
+                      ? `Starts in ${Math.max(0, minutesOf(nextClass.start_time) - nowMinutes)} min`
+                      : `${upNext.dayOffset === 1 ? "Tomorrow" : nextClass.day} at ${fmtTime(nextClass.start_time)}`}
                   </p>
                 ) : null}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-ink-3">
-                {todaysClasses.length
-                  ? "All of today's classes are done. Enjoy the rest of the day."
-                  : `No classes scheduled for ${weekday}.`}
-              </p>
+              <p className="mt-3 text-sm text-ink-3">No classes are on the timetable yet.</p>
             )}
           </div>
 
@@ -205,16 +220,33 @@ export default function Overview({ onNavigate }) {
             <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-caution/30 bg-caution-soft px-3 py-2.5">
               <Alert size={16} className="mt-px shrink-0 text-caution" />
               <p className="text-[13px] leading-snug text-ink-2">
-                <span className="font-medium text-ink">{notices.length} high-priority notice{notices.length === 1 ? "" : "s"}</span>{" "}
-                may change today's plan — check announcements before heading to class.
+                <span className="font-medium text-ink">
+                  {notices.length} high-priority notice{notices.length === 1 ? "" : "s"}
+                </span>{" "}
+                may change today’s plan — check announcements before heading to class.
               </p>
             </div>
           ) : null}
         </Card>
 
-        <StatTile icon={Door} label="Rooms free right now" value={freeNow} onClick={() => onNavigate("rooms")} />
-        <StatTile icon={Clipboard} label="Due in the next 7 days" value={dueSoon.length} onClick={() => onNavigate("assignments")} />
-        <StatTile icon={Calendar} label={`Classes on ${weekday}`} value={todaysClasses.length} onClick={() => onNavigate("schedules")} />
+        <StatTile
+          icon={Door}
+          label="Rooms free for the next hour"
+          value={windowEnd ? (freeRooms.data?.length ?? "—") : "—"}
+          onClick={() => onNavigate("rooms")}
+        />
+        <StatTile
+          icon={Clipboard}
+          label="Due in the next 7 days"
+          value={dueSoon.length}
+          onClick={() => onNavigate("assignments")}
+        />
+        <StatTile
+          icon={Calendar}
+          label={`Classes on ${weekday}`}
+          value={todaysClasses.length}
+          onClick={() => onNavigate("schedules")}
+        />
         <StatTile icon={Ticket} label="Upcoming events" value={upcoming.length} onClick={() => onNavigate("events")} />
 
         {/* Today */}
@@ -235,7 +267,7 @@ export default function Overview({ onNavigate }) {
                   const done = minutesOf(row.end_time) <= nowMinutes;
                   const active = row === currentClass;
                   return (
-                    <Row key={row.id} className={cx(done && "opacity-55")}>
+                    <Row key={row.id}>
                       <span
                         className={cx(
                           "w-24 shrink-0 text-[13px] font-medium tabular",
@@ -245,10 +277,15 @@ export default function Overview({ onNavigate }) {
                         {fmtTime(row.start_time)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-ink">
+                        <span
+                          className={cx(
+                            "block truncate text-sm font-medium",
+                            done ? "text-ink-2 line-through" : "text-ink",
+                          )}
+                        >
                           {row.course} · {row.title}
                         </span>
-                        <span className="block text-[12px] text-ink-3">{row.instructor}</span>
+                        <span className="block text-[12px] text-ink-3">{done ? "Finished" : row.instructor}</span>
                       </span>
                       <Badge tone={active ? "accent" : "neutral"}>{row.room}</Badge>
                     </Row>
@@ -364,10 +401,6 @@ export default function Overview({ onNavigate }) {
           </div>
         </Card>
       </div>
-
-      <p className="mt-4 text-center text-[12px] text-ink-3">
-        Every figure above is read from the database on load and re-read the moment anything changes — nothing is cached.
-      </p>
     </div>
   );
 }

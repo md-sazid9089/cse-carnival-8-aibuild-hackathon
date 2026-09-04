@@ -1,14 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { cx, titleCase } from "../lib/format.js";
+import { Alert } from "../lib/icons.jsx";
 import Modal from "./Modal.jsx";
 import { Button, Field, Select, TextArea, TextInput } from "./ui.jsx";
-
-const emptyValue = (field) => (field.type === "tags" ? "" : (field.default ?? ""));
 
 function buildInitial(fields, initial) {
   const form = {};
   for (const field of fields) {
-    let value = initial?.[field.key] ?? emptyValue(field);
+    let value = initial?.[field.key] ?? field.default ?? "";
     if (field.type === "tags" && Array.isArray(value)) value = value.join(", ");
     if (field.type === "date" && typeof value === "string") value = value.slice(0, 10);
     if (field.type === "time" && typeof value === "string") value = value.slice(0, 5);
@@ -51,23 +50,33 @@ function serialize(form, fields) {
   const out = { ...form };
   for (const field of fields) {
     const raw = out[field.key];
+    const blank = String(raw ?? "").trim() === "";
+    if (field.omitWhenEmpty && blank) {
+      delete out[field.key];
+      continue;
+    }
     if (field.type === "tags")
       out[field.key] = String(raw ?? "")
         .split(",")
         .map((part) => part.trim())
         .filter(Boolean);
-    else if (field.type === "number") out[field.key] = Number(raw);
+    else if (field.type === "number") out[field.key] = blank ? (field.min ?? 0) : Number(raw);
     else if (typeof raw === "string") out[field.key] = raw.trim();
-    if (field.optional && (out[field.key] === "" || Number.isNaN(out[field.key]))) delete out[field.key];
   }
   return out;
 }
 
+/**
+ * Create/edit form in a dialog. `onSubmit` must throw on failure — the reason is
+ * then shown inline and persistently, because a toast that vanishes after a few
+ * seconds is the wrong place for "this room is already booked at that time".
+ */
 export default function RecordModal({
   title,
   description,
   fields,
   initial,
+  recordKey = "new",
   submitLabel = "Save",
   onSubmit,
   onClose,
@@ -75,14 +84,19 @@ export default function RecordModal({
 }) {
   const [form, setForm] = useState(() => buildInitial(fields, initial));
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState(null);
   const [busy, setBusy] = useState(false);
   const firstFieldRef = useRef(null);
   const formId = useId();
 
+  // Reset on a *different record*, never merely because the parent re-rendered:
+  // live data re-renders these pages constantly and would wipe what was typed.
   useEffect(() => {
     setForm(buildInitial(fields, initial));
     setErrors({});
-  }, [fields, initial]);
+    setSubmitError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordKey]);
 
   const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -99,76 +113,21 @@ export default function RecordModal({
       return;
     }
     setBusy(true);
+    setSubmitError(null);
     try {
       await onSubmit(serialize(form, fields));
+    } catch (error) {
+      setSubmitError(error.message || "Could not save. Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  const controls = useMemo(
-    () =>
-      fields.map((field, index) => {
-        const id = `${formId}-${field.key}`;
-        const invalid = Boolean(errors[field.key]);
-        const shared = {
-          id,
-          invalid,
-          value: form[field.key] ?? "",
-          onChange: (event) => set(field.key, event.target.value),
-          ref: index === 0 ? firstFieldRef : undefined,
-        };
-
-        let control;
-        if (field.type === "select")
-          control = (
-            <Select {...shared}>
-              <option value="" disabled>
-                Select…
-              </option>
-              {field.options.map((option) => (
-                <option key={option} value={option}>
-                  {titleCase(option)}
-                </option>
-              ))}
-            </Select>
-          );
-        else if (field.type === "textarea") control = <TextArea {...shared} rows={field.rows ?? 3} />;
-        else
-          control = (
-            <TextInput
-              {...shared}
-              type={field.type === "number" ? "number" : (field.type ?? "text")}
-              inputMode={field.type === "number" ? "numeric" : undefined}
-              min={field.type === "number" ? (field.min ?? 0) : undefined}
-              placeholder={field.placeholder}
-              autoComplete="off"
-            />
-          );
-
-        return (
-          <Field
-            key={field.key}
-            label={field.label}
-            htmlFor={id}
-            required={!field.optional}
-            hint={field.hint}
-            error={errors[field.key]}
-            className={cx(field.wide && "sm:col-span-2")}
-          >
-            {control}
-          </Field>
-        );
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fields, form, errors, formId],
-  );
-
   return (
     <Modal
       title={title}
       description={description}
-      onClose={busy ? undefined : onClose}
+      onClose={onClose}
       initialFocusRef={firstFieldRef}
       footer={
         <>
@@ -181,8 +140,68 @@ export default function RecordModal({
         </>
       }
     >
+      {submitError ? (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2.5 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2.5"
+        >
+          <Alert size={16} className="mt-px shrink-0 text-critical" />
+          <p className="text-[13px] leading-snug text-ink">{submitError}</p>
+        </div>
+      ) : null}
+
       <form id={formId} onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-2">
-        {controls}
+        {fields.map((field, index) => {
+          const id = `${formId}-${field.key}`;
+          const invalid = Boolean(errors[field.key]);
+          const shared = {
+            id,
+            invalid,
+            required: !field.optional,
+            value: form[field.key] ?? "",
+            onChange: (event) => set(field.key, event.target.value),
+            ref: index === 0 ? firstFieldRef : undefined,
+          };
+
+          return (
+            <Field
+              key={field.key}
+              label={field.label}
+              htmlFor={id}
+              required={!field.optional}
+              hint={field.hint}
+              error={errors[field.key]}
+              className={cx(field.wide && "sm:col-span-2")}
+            >
+              {({ describedBy }) =>
+                field.type === "select" ? (
+                  <Select {...shared} aria-describedby={describedBy} className="capitalize">
+                    <option value="" disabled>
+                      Select…
+                    </option>
+                    {field.options.map((option) => (
+                      <option key={option} value={option}>
+                        {titleCase(option)}
+                      </option>
+                    ))}
+                  </Select>
+                ) : field.type === "textarea" ? (
+                  <TextArea {...shared} aria-describedby={describedBy} rows={field.rows ?? 3} />
+                ) : (
+                  <TextInput
+                    {...shared}
+                    aria-describedby={describedBy}
+                    type={field.type === "number" ? "number" : (field.type ?? "text")}
+                    inputMode={field.type === "number" ? "numeric" : undefined}
+                    min={field.type === "number" ? (field.min ?? 0) : undefined}
+                    placeholder={field.placeholder}
+                    autoComplete="off"
+                  />
+                )
+              }
+            </Field>
+          );
+        })}
       </form>
     </Modal>
   );

@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import DataTable from "../components/DataTable.jsx";
-import { ErrorState, FilterSelect, LiveDot, PageHeader, ResultCount, SearchInput, Toolbar } from "../components/page.jsx";
+import {
+  ErrorState,
+  FilterSelect,
+  LiveDot,
+  PageHeader,
+  ResultCount,
+  SearchInput,
+  StaleNotice,
+  Toolbar,
+} from "../components/page.jsx";
 import RecordModal from "../components/RecordModal.jsx";
 import { Badge, Button, Card, EmptyState, IconButton, Segmented, Skeleton, StatusBadge } from "../components/ui.jsx";
 import { entities } from "../entities.jsx";
@@ -8,6 +17,7 @@ import { useApi, useDebounced, useSort, useSSE } from "../hooks.js";
 import { useCampus } from "../lib/campus.jsx";
 import { useCrud } from "../lib/crud.js";
 import { cx, fmtDate, relativeDay } from "../lib/format.js";
+import { isExpired } from "../lib/rules.js";
 import { Grid, Megaphone, Pencil, Plus, Rows, Search, Trash } from "../lib/icons.jsx";
 
 const config = entities.announcements;
@@ -17,11 +27,13 @@ const ACCENT = { high: "bg-critical", medium: "bg-caution", low: "bg-line-strong
 function NoticeCard({ notice, today, expired, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <Card className={cx("flex overflow-hidden", expired && "opacity-70")}>
-      <span className={cx("w-1 shrink-0", ACCENT[notice.priority])} aria-hidden="true" />
+    <Card className="flex overflow-hidden">
+      <span className={cx("w-1 shrink-0", expired ? "bg-line-strong" : ACCENT[notice.priority])} aria-hidden="true" />
       <div className="min-w-0 flex-1 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[15px] leading-snug font-semibold text-ink">{notice.title}</h3>
+          <h3 className={cx("text-[15px] leading-snug font-semibold", expired ? "text-ink-2" : "text-ink")}>
+            {notice.title}
+          </h3>
           <div className="flex shrink-0 items-center gap-1.5">
             <StatusBadge value={notice.priority} dot />
             {expired ? <Badge>Expired</Badge> : null}
@@ -54,19 +66,17 @@ function NoticeCard({ notice, today, expired, onEdit, onDelete }) {
 }
 
 export default function Announcements({ initialQuery = "" }) {
-  const { data, error, loading, refreshing, refresh } = useApi("/api/announcements");
+  const { data, error, staleError, loading, refreshing, refresh } = useApi("/api/announcements");
   const { today } = useCampus();
   const [view, setView] = useState("board");
   const [query, setQuery] = useState(initialQuery);
   const [priority, setPriority] = useState("");
-  const [showExpired, setShowExpired] = useState(true);
+  const [showExpired, setShowExpired] = useState(false);
   const search = useDebounced(query);
 
   useSSE("announcements", refresh);
 
   const crud = useCrud({ endpoint: config.endpoint, singular: "announcement", refresh, labelFor: (row) => row.title });
-
-  const isExpired = (notice) => notice.expires < today;
 
   const filtered = useMemo(() => {
     const rows = data ?? [];
@@ -74,14 +84,20 @@ export default function Announcements({ initialQuery = "" }) {
     return rows
       .filter((notice) => {
         if (priority && notice.priority !== priority) return false;
-        if (!showExpired && notice.expires < today) return false;
+        if (!showExpired && isExpired(notice, today)) return false;
         if (!needle) return true;
         return config.searchKeys.some((key) => String(notice[key] ?? "").toLowerCase().includes(needle));
       })
-      .sort((a, b) => RANK[a.priority] - RANK[b.priority] || b.date.localeCompare(a.date));
+      // Active notices always outrank expired ones, whatever their priority.
+      .sort(
+        (a, b) =>
+          Number(isExpired(a, today)) - Number(isExpired(b, today)) ||
+          RANK[a.priority] - RANK[b.priority] ||
+          String(b.date).localeCompare(String(a.date)),
+      );
   }, [data, search, priority, showExpired, today]);
 
-  const { sorted, sort, toggle } = useSort(filtered);
+  const { sorted, sort, toggle } = useSort(filtered, null, config.columns);
 
   return (
     <div className="animate-fade-in">
@@ -113,18 +129,26 @@ export default function Announcements({ initialQuery = "" }) {
           }
         >
           <SearchInput value={query} onChange={setQuery} placeholder="Search notices" id="search-announcements" />
-          <FilterSelect label="Priority" options={["high", "medium", "low"]} value={priority} onChange={setPriority} />
-          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 text-[13px] text-ink-2 transition-colors hover:border-line-strong">
+          <FilterSelect
+            label="Priority"
+            allLabel="Any priority"
+            options={["high", "medium", "low"]}
+            value={priority}
+            onChange={setPriority}
+          />
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-line-control bg-surface px-3 text-[13px] text-ink-2 transition-colors hover:border-ink-3">
             <input
               type="checkbox"
               checked={showExpired}
               onChange={(event) => setShowExpired(event.target.checked)}
               className="size-3.5 accent-accent"
             />
-            Show expired
+            Include expired
           </label>
         </Toolbar>
       </PageHeader>
+
+      <StaleNotice message={staleError} onRetry={refresh} />
 
       {error ? (
         <ErrorState message={error} onRetry={refresh} />
@@ -150,13 +174,13 @@ export default function Announcements({ initialQuery = "" }) {
           />
         </Card>
       ) : view === "board" ? (
-        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-start gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {filtered.map((notice) => (
             <NoticeCard
               key={notice.id}
               notice={notice}
               today={today}
-              expired={isExpired(notice)}
+              expired={isExpired(notice, today)}
               onEdit={crud.openEdit}
               onDelete={crud.remove}
             />
@@ -166,6 +190,7 @@ export default function Announcements({ initialQuery = "" }) {
         <DataTable
           columns={config.columns}
           rows={sorted}
+          label="Announcements"
           sort={sort}
           onSort={toggle}
           onEdit={crud.openEdit}
@@ -177,7 +202,8 @@ export default function Announcements({ initialQuery = "" }) {
       {crud.modal ? (
         <RecordModal
           title={crud.modal.mode === "edit" ? "Edit announcement" : "New announcement"}
-          description="High-priority notices can override the timetable — the assistant checks them before answering."
+          recordKey={`notice-${crud.modal.mode}-${crud.modal.row?.id ?? "new"}`}
+          description="High-priority notices are surfaced on Today and can change the timetable."
           fields={config.fields}
           initial={crud.modal.row ?? { date: today, expires: today }}
           submitLabel={crud.modal.mode === "edit" ? "Save changes" : "Post announcement"}
