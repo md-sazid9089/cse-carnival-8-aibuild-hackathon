@@ -6,7 +6,7 @@ export function Container({ className, ...props }: HTMLAttributes<HTMLDivElement
   return <div className={cn("mx-auto w-full max-w-6xl px-5 sm:px-8", className)} {...props} />;
 }
 
-type SectionProps = HTMLAttributes<HTMLElement> & {
+type SectionProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
   id?: string;
   eyebrow?: string;
   title: ReactNode;

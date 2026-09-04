@@ -3,6 +3,7 @@ import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApi
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
 import { entities } from "./entities.jsx";
+import LandingPage from "./landing/LandingPage.tsx";
 import Events from "./pages/Events.jsx";
 import Overview from "./pages/Overview.jsx";
 import ResourcePage from "./pages/ResourcePage.jsx";
@@ -21,6 +22,7 @@ const NAV = [
 
 function getRouteFromPath(pathname) {
   const decoded = decodeURIComponent(pathname || "").toLowerCase().trim();
+  if (decoded === "/" || decoded === "") return "landing";
   if (
     decoded === "/auth/signin" ||
     decoded === "/auth/sign-in" ||
@@ -86,12 +88,20 @@ export default function App() {
   const navigateTo = (newTab, updateHistory = true) => {
     setTab(newTab);
     if (updateHistory) {
-      let targetPath = "/";
-      if (newTab === "signin") targetPath = "/auth/signin";
+      let targetPath = "/overview";
+      if (newTab === "landing") targetPath = "/";
+      else if (newTab === "signin") targetPath = "/auth/signin";
       else if (newTab === "signup") targetPath = "/auth/signup";
       else if (newTab !== "overview") targetPath = `/${newTab}`;
       window.history.pushState(null, "", targetPath);
     }
+  };
+
+  // Landing CTAs hand over a path; resolve it to a tab so the SPA stays in control.
+  const navigateToPath = (path) => {
+    window.history.pushState(null, "", path);
+    setTab(getRouteFromPath(path));
+    window.scrollTo({ top: 0 });
   };
 
   const handleSignOut = () => {
@@ -101,6 +111,10 @@ export default function App() {
   };
 
   // If on Sign In or Sign Up routes, render dedicated full-page auth screens
+  if (tab === "landing") {
+    return <LandingPage onNavigate={navigateToPath} />;
+  }
+
   if (tab === "signin") {
     return (
       <>

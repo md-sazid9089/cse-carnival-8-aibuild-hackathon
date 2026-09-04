@@ -1,5 +1,7 @@
-import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
+import { motion, useReducedMotion, type HTMLMotionProps, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
+
+export const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
 type RevealProps = HTMLMotionProps<"div"> & {
   children: ReactNode;
@@ -17,7 +19,7 @@ export function Reveal({ children, delay = 0, y = 24, once = true, ...rest }: Re
       initial={{ opacity: 0, y: reduced ? 0 : y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once, margin: "0px 0px -10% 0px" }}
-      transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.6, delay, ease: EASE_OUT }}
       {...rest}
     >
       {children}
@@ -25,12 +27,12 @@ export function Reveal({ children, delay = 0, y = 24, once = true, ...rest }: Re
   );
 }
 
-export const staggerContainer = {
+export const staggerContainer: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
 };
 
-export const staggerItem = {
+export const staggerItem: Variants = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_OUT } },
 };

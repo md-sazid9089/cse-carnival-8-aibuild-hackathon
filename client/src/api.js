@@ -1,6 +1,9 @@
 const STORAGE_USER_KEY = "campusos_user";
 const STORAGE_TOKEN_KEY = "campusos_token";
 
+// Same-origin: Vite proxies /api in dev, FastAPI serves the built client in prod.
+export const API_BASE = "";
+
 const DEFAULT_USER = {
   id: "usr-001",
   student_id: "20-40532",

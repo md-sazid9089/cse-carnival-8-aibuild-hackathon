@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChatBubble, TypingDots, TypingText } from "../components/chat";
+import { ChatBubble, TypingDots, TypingText } from "../../components/chat";
 
 const SIDEBAR = [
   { label: "Overview", icon: LayoutDashboard, active: true },
