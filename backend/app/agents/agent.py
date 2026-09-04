@@ -158,7 +158,7 @@ async def run_turn(user_msg: str, profile: dict, conversation_id: str | None = N
                     retried_toolless = True
                     models_override = others
                     continue
-                grounded = degraded.answer(user_msg, profile) if config.AGENT_DEGRADED_MODE else None
+                grounded = degraded.answer(user_msg, profile, note="grounded") if config.AGENT_DEGRADED_MODE else None
                 if grounded:
                     await _persist(cid, profile, user_msg, grounded["reply"], grounded["tool_calls"])
                     return {**grounded, "conversation_id": cid, "agent": "degraded",

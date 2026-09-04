@@ -165,21 +165,21 @@ export function DashboardPreview() {
             </Tile>
 
             <Tile title="Upcoming events">
-              <p className="text-xs font-semibold text-forest-deep">Deep Learning guest lecture</p>
-              <p className="text-[11px] text-ink-muted">Sun · 12:30 · 7C02</p>
-              <p className="mt-2 text-xs font-semibold text-forest-deep">Git & GitHub workshop</p>
-              <p className="text-[11px] text-ink-muted">Tue · 15:00 · 7B01 · full</p>
+              <p className="text-xs font-semibold text-ink">Deep Learning guest lecture</p>
+              <p className="text-[11px] text-ink-3">Sun · 12:30 · 7C02</p>
+              <p className="mt-2 text-xs font-semibold text-ink">Git & GitHub workshop</p>
+              <p className="text-[11px] text-ink-3">Tue · 15:00 · 7B01 · full</p>
             </Tile>
 
             <Tile title="Announcements">
               <ul className="space-y-1.5 text-xs">
                 <li className="flex items-start gap-2">
-                  <span className="mt-0.5 rounded-full bg-peach/70 px-1.5 text-[9px] font-bold uppercase text-terracotta-deep">high</span>
-                  <span className="text-forest-deep">CSE 4113 rescheduled</span>
+                  <span className="mt-0.5 rounded bg-critical-soft px-1.5 text-[9px] font-semibold uppercase text-critical">high</span>
+                  <span className="text-ink">CSE 4113 rescheduled</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-0.5 rounded-full bg-sage/40 px-1.5 text-[9px] font-bold uppercase text-forest">med</span>
-                  <span className="text-forest-deep">Library hours extended</span>
+                  <span className="mt-0.5 rounded bg-caution-soft px-1.5 text-[9px] font-semibold uppercase text-caution">med</span>
+                  <span className="text-ink">Library hours extended</span>
                 </li>
               </ul>
             </Tile>

@@ -12,7 +12,10 @@ OFFLINE_MSG = ("The AI is temporarily unavailable, so I can't take actions right
                "Use the dashboard to book a room or register for an event — I can still answer "
                "questions from live data.")
 # Every templated answer says so, so nobody mistakes a canned reply for the model's own work.
-READ_ONLY_NOTE = "**Read-only mode** — the AI model is unavailable, so this comes straight from live data."
+NOTES = {
+    "offline": "**Read-only mode** — the AI model is unavailable, so this comes straight from live data.",
+    "grounded": "**Straight from live data** — the model answered without reading the records, so here they are.",
+}
 
 # Anchored, non-backtracking patterns; write verbs and negations are excluded before matching.
 WRITE_VERBS = re.compile(r"\b(book|booking|reserve|register|registration|enrol|enroll|sign\s?up|cancel|"
@@ -64,7 +67,7 @@ def _room_filters(text: str) -> tuple[str | None, int | None, list[str]]:
     return kind, seats, gear
 
 
-def answer(message: str, profile: dict) -> dict | None:
+def answer(message: str, profile: dict, note: str = "offline") -> dict | None:
     """Return a templated read-only answer, or None when the message is not safely answerable."""
     text = (message or "").strip()
     if not text:
@@ -135,5 +138,5 @@ def answer(message: str, profile: dict) -> dict | None:
     except Exception:  # noqa: BLE001 - degraded mode must never raise
         return None
 
-    return {"reply": f"{READ_ONLY_NOTE}\n{body}", "degraded": True,
+    return {"reply": f"{NOTES.get(note, NOTES['offline'])}\n{body}", "degraded": True,
             "tool_calls": [{"tool": tool, "label": tool, "ok": True}]}
