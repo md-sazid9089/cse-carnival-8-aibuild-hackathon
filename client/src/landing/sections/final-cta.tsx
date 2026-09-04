@@ -56,7 +56,8 @@ export function FinalCta() {
               <span className="mt-2 block text-peach">Make it intelligent.</span>
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-sage sm:text-lg">
-              One platform for campus data. One AI agent for everything you need to know and do.
+              One platform for campus data. One AI agent for everything you need to know and do — exclusively for AUST
+              students, with your @aust.edu account.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" variant="accent" onClick={() => navigate(APP_PATH)} className="w-full sm:w-auto">

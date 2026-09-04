@@ -1,16 +1,39 @@
-"""Authentication service: password hashing (PBKDF2-HMAC-SHA256), sign up, and sign in."""
+"""Authentication service: AUST-only identity, password hashing (PBKDF2-HMAC-SHA256), sign up, and sign in."""
 import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
 
-from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S, DEPARTMENT
+from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S, EMAIL_DOMAIN
 from ..db import execute, q, q1
-from .common import DomainError, now_local
+from .common import DomainError
 
 ITERATIONS = 100_000
+
+# AUST issues exactly one address per student — `<department>.<student id>@aust.edu` — so the
+# address is the record: both the ID and the department are read from it, never typed by hand.
+_DOMAIN = re.escape(EMAIL_DOMAIN)
+CAMPUS_DOMAIN_RE = re.compile(rf"^[^@\s]+@(?:[a-z0-9-]+\.)*{_DOMAIN}$")
+CAMPUS_EMAIL_RE = re.compile(
+    rf"^(?P<department>[a-z]{{2,10}})\.(?P<student_id>\d[a-z0-9-]{{3,19}})@(?:[a-z0-9-]+\.)*{_DOMAIN}$"
+)
+CAMPUS_EMAIL_HINT = f"department.studentid@{EMAIL_DOMAIN} (for example cse.20250999@{EMAIL_DOMAIN})"
+CAMPUS_ONLY_MESSAGE = f"CampusOS is for AUST students only — use your @{EMAIL_DOMAIN} email address"
+
+
+def is_campus_email(email: str) -> bool:
+    return bool(CAMPUS_DOMAIN_RE.match((email or "").strip().lower()))
+
+
+def parse_campus_email(email: str) -> tuple[str, str]:
+    """Return (department, student_id) read out of an AUST address."""
+    match = CAMPUS_EMAIL_RE.match((email or "").strip().lower())
+    if not match:
+        raise DomainError("INVALID_CAMPUS_EMAIL", f"Use your AUST email in the format {CAMPUS_EMAIL_HINT}")
+    return match.group("department").upper(), match.group("student_id")
 
 
 def hash_password(password: str) -> str:
@@ -89,38 +112,29 @@ def get_user_permissions(role_id: str = "student") -> list[str]:
 
 def sign_up(name: str, email: str, password: str, student_id: str | None = None,
             department: str | None = None) -> dict:
-    """Register a new account. Every account is a student."""
+    """Register a new AUST student. The campus email decides the student ID and the department."""
     name = (name or "").strip()
     email = (email or "").strip().lower()
-    student_id = (student_id or "").strip() or None
-    department = (department or "").strip() or DEPARTMENT
 
     if not name:
         raise DomainError("MISSING_NAME", "Full name is required")
     if not email or "@" not in email:
         raise DomainError("INVALID_EMAIL", "A valid email address is required")
+    if not is_campus_email(email):
+        raise DomainError("NON_CAMPUS_EMAIL", CAMPUS_ONLY_MESSAGE)
     if not password or len(password) < 6:
         raise DomainError("WEAK_PASSWORD", "Password must be at least 6 characters")
 
-    # Check for existing email
+    # Anything the form sent for these two is ignored: the university address is the source of truth.
+    department, student_id = parse_campus_email(email)
+
     existing_email = q1("SELECT id FROM users WHERE LOWER(email) = %s", [email])
     if existing_email:
         raise DomainError("EMAIL_EXISTS", "An account with this email already exists", 409)
 
-    # Self-registered accounts get an ID in this year's series, e.g. 26-10001.
-    # MAX, not COUNT: deleting an account must never hand its number to somebody else.
-    if not student_id:
-        prefix = now_local().strftime("%y")
-        row = q1(
-            """SELECT COALESCE(MAX(NULLIF(split_part(student_id, '-', 2), '')::int), 10000) + 1 AS n
-               FROM users WHERE student_id LIKE %s""",
-            [f"{prefix}-%"],
-        )
-        student_id = f"{prefix}-{row['n']:05d}"
-    else:
-        existing_sid = q1("SELECT id FROM users WHERE student_id = %s", [student_id])
-        if existing_sid:
-            raise DomainError("STUDENT_ID_EXISTS", "An account with this student ID already exists", 409)
+    existing_sid = q1("SELECT id FROM users WHERE student_id = %s", [student_id])
+    if existing_sid:
+        raise DomainError("STUDENT_ID_EXISTS", "An account with this student ID already exists", 409)
 
     # Keyed off the unique student ID so the account key is stable and collision-free.
     user_id = f"usr-{student_id}"
@@ -143,10 +157,13 @@ def sign_up(name: str, email: str, password: str, student_id: str | None = None,
 
 
 def sign_in(email_or_id: str, password: str) -> dict:
-    """Sign in using email or student_id and password."""
+    """Sign in using an AUST email or the student ID, plus the password."""
     ident = (email_or_id or "").strip()
     if not ident or not password:
         raise DomainError("MISSING_CREDENTIALS", "Email/Student ID and password are required")
+
+    if "@" in ident and not is_campus_email(ident):
+        raise DomainError("NON_CAMPUS_EMAIL", CAMPUS_ONLY_MESSAGE)
 
     # Look up user by email or student ID
     user = q1(

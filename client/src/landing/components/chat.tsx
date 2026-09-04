@@ -20,7 +20,7 @@ export function ChatBubble({ role, children, className, source }: BubbleProps) {
       className={cn("flex w-full gap-2.5", isUser ? "justify-end" : "justify-start", className)}
     >
       {!isUser && (
-        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-forest text-cream-50">
+        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-ink text-ink-invert">
           <Sparkles className="size-3.5" aria-hidden />
         </span>
       )}
@@ -28,14 +28,14 @@ export function ChatBubble({ role, children, className, source }: BubbleProps) {
         <div
           className={cn(
             "inline-block rounded-2xl px-3.5 py-2.5 text-left text-sm leading-relaxed",
-            isUser ? "rounded-br-md bg-forest-deep text-cream-50" : "rounded-bl-md bg-cream-100 text-forest-deep",
+            isUser ? "rounded-br-md bg-ink text-ink-invert" : "rounded-bl-md bg-surface-3 text-ink",
           )}
         >
           {children}
         </div>
         {source && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-moss">
-            <span className="inline-block size-1.5 rounded-full bg-moss" aria-hidden />
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-ink-3">
+            <span className="inline-block size-1.5 rounded-full bg-accent" aria-hidden />
             {source}
           </div>
         )}
@@ -50,7 +50,7 @@ export function TypingDots({ className }: { className?: string }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="size-1.5 rounded-full bg-moss animate-pulse-dot"
+          className="size-1.5 rounded-full bg-ink-3 animate-pulse-dot"
           style={{ animationDelay: `${i * 0.18}s` }}
         />
       ))}

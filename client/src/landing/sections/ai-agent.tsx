@@ -43,17 +43,17 @@ export function AiAgent() {
       <div ref={ref} className="grid items-start gap-8 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
         {/* chat */}
         <Reveal
-          className="flex min-h-[420px] flex-col rounded-3xl border border-cream-200 bg-white shadow-lift"
+          className="flex min-h-[420px] flex-col rounded-2xl border border-line bg-surface shadow-lg"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
         >
-          <div className="flex items-center gap-2.5 border-b border-cream-200 px-5 py-3.5">
-            <span className="grid size-7 place-items-center rounded-full bg-forest text-cream-50">
+          <div className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+            <span className="grid size-7 place-items-center rounded-lg bg-ink text-ink-invert">
               <Sparkles className="size-3.5" aria-hidden />
             </span>
             <div>
-              <p className="text-sm font-semibold text-forest-deep">CampusOS Assistant</p>
-              <p className="text-[11px] text-moss">Reads live data · Acts with permission</p>
+              <p className="text-sm font-semibold text-ink">CampusOS Assistant</p>
+              <p className="text-[11px] text-ink-3">Reads live data · Acts with permission</p>
             </div>
           </div>
 
@@ -86,7 +86,7 @@ export function AiAgent() {
                   initial={{ opacity: 0, y: 4 }}
                   animate={stage !== "typing" ? { opacity: 1, y: 0 } : undefined}
                   transition={{ delay: i * 0.12 }}
-                  className="rounded-full border border-sage/60 bg-sage/20 px-2.5 py-1 font-mono text-[11px] text-forest"
+                  className="rounded-md border border-line bg-surface-3 px-2.5 py-1 font-mono text-[11px] text-ink-3"
                 >
                   {t}()
                 </motion.span>
@@ -98,7 +98,7 @@ export function AiAgent() {
         {/* queries */}
         <div>
           <Reveal>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-terracotta">Try asking</p>
+            <p className="text-xs font-semibold tracking-[0.18em] uppercase text-accent">Try asking</p>
             <ul className="mt-4 flex flex-col gap-2" role="tablist" aria-label="Example queries">
               {CONVERSATIONS.map((c, i) => {
                 const selected = i === index;
@@ -113,16 +113,16 @@ export function AiAgent() {
                         setPaused(true);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition-[background-color,border-color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta",
+                        "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-[background-color,border-color,transform] duration-200",
                         selected
-                          ? "border-forest-deep bg-forest-deep text-cream-50 shadow-soft"
-                          : "border-cream-200 bg-white text-forest-deep hover:-translate-y-0.5 hover:border-sage",
+                          ? "border-ink bg-ink text-ink-invert shadow-xs"
+                          : "border-line bg-surface text-ink hover:-translate-y-0.5 hover:border-line-strong",
                       )}
                     >
                       <span
                         className={cn(
                           "size-2 shrink-0 rounded-full",
-                          selected ? "bg-terracotta" : "bg-cream-200",
+                          selected ? "bg-accent" : "bg-surface-3",
                         )}
                         aria-hidden
                       />
@@ -141,9 +141,9 @@ export function AiAgent() {
               ["Knows what changed", "Edit a notice in the dashboard and the very next question reflects it."],
               ["Knows when to stop", "Vague request? It asks. Not allowed? It refuses, and tells you why."],
             ].map(([t, d]) => (
-              <div key={t} className="rounded-2xl border border-cream-200 bg-white/70 p-4">
-                <p className="text-sm font-semibold text-forest-deep">{t}</p>
-                <p className="mt-1 text-sm leading-relaxed text-ink-muted">{d}</p>
+              <div key={t} className="rounded-xl border border-line bg-surface/70 p-4">
+                <p className="text-sm font-semibold text-ink">{t}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink-2">{d}</p>
               </div>
             ))}
           </Reveal>

@@ -40,7 +40,7 @@ export function Navbar() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className={cn(
           "mx-auto flex max-w-6xl items-center justify-between rounded-2xl border px-4 backdrop-blur-xl transition-[background-color,border-color,box-shadow] duration-300 sm:px-5",
-          compact ? "border-cream-200/80 bg-cream-50/85 shadow-soft" : "border-transparent bg-cream-50/50",
+          compact ? "border-line bg-surface/85 shadow-sm" : "border-transparent bg-canvas/50",
         )}
       >
         <a
@@ -49,7 +49,7 @@ export function Navbar() {
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
-          className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta"
+          className="rounded-lg"
           aria-label="CampusOS home"
         >
           <Logo />
@@ -61,7 +61,7 @@ export function Navbar() {
               <a
                 href={l.href}
                 onClick={go(l.href)}
-                className="rounded-full px-3.5 py-2 text-sm font-medium text-forest transition-colors hover:bg-cream-100 hover:text-forest-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta"
+                className="rounded-lg px-3.5 py-2 text-sm font-medium text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink"
               >
                 {l.label}
               </a>
@@ -88,7 +88,7 @@ export function Navbar() {
 
         <button
           type="button"
-          className="grid size-10 place-items-center rounded-full text-forest-deep transition-colors hover:bg-cream-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terracotta md:hidden"
+          className="grid size-10 place-items-center rounded-lg text-ink transition-colors hover:bg-surface-3 md:hidden"
           aria-expanded={open}
           aria-controls="mobile-menu"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -106,7 +106,7 @@ export function Navbar() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="mx-auto mt-2 max-w-6xl rounded-2xl border border-cream-200 bg-cream-50/95 p-3 shadow-lift backdrop-blur-xl md:hidden"
+            className="mx-auto mt-2 max-w-6xl rounded-2xl border border-line bg-surface/95 p-3 shadow-lg backdrop-blur-xl md:hidden"
           >
             <ul className="flex flex-col">
               {NAV_LINKS.map((l, i) => (
@@ -119,14 +119,14 @@ export function Navbar() {
                   <a
                     href={l.href}
                     onClick={go(l.href)}
-                    className="block rounded-xl px-4 py-3 text-base font-medium text-forest-deep hover:bg-cream-100"
+                    className="block rounded-lg px-4 py-3 text-base font-medium text-ink hover:bg-surface-3"
                   >
                     {l.label}
                   </a>
                 </motion.li>
               ))}
             </ul>
-            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-cream-200 pt-3">
+            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-line pt-3">
               <Button variant="secondary" onClick={() => navigate(SIGN_IN_PATH)}>
                 Sign In
               </Button>

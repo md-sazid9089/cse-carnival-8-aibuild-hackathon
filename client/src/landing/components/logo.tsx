@@ -7,16 +7,16 @@ export function Logo({ className, dark = false }: { className?: string; dark?: b
       <span
         className={cn(
           "grid size-8 grid-cols-2 gap-[3px] rounded-lg p-[5px]",
-          dark ? "bg-cream-50" : "bg-forest-deep",
+          dark ? "bg-brand-panel-ink" : "bg-ink",
         )}
         aria-hidden
       >
-        <span className={cn("rounded-[3px]", dark ? "bg-forest/40" : "bg-cream-50/40")} />
-        <span className={cn("rounded-[3px]", dark ? "bg-forest/40" : "bg-cream-50/40")} />
-        <span className={cn("rounded-[3px]", dark ? "bg-forest/40" : "bg-cream-50/40")} />
-        <span className="rounded-[3px] bg-terracotta" />
+        <span className={cn("rounded-[3px]", dark ? "bg-brand-panel/40" : "bg-ink-invert/40")} />
+        <span className={cn("rounded-[3px]", dark ? "bg-brand-panel/40" : "bg-ink-invert/40")} />
+        <span className={cn("rounded-[3px]", dark ? "bg-brand-panel/40" : "bg-ink-invert/40")} />
+        <span className="rounded-[3px] bg-accent" />
       </span>
-      <span className={cn("font-display text-lg font-semibold tracking-tight", dark ? "text-cream-50" : "text-forest-deep")}>
+      <span className={cn("text-lg font-semibold tracking-tight", dark ? "text-brand-panel-ink" : "text-ink")}>
         CampusOS
       </span>
     </span>

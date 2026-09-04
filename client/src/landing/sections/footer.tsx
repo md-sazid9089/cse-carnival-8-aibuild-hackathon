@@ -10,7 +10,8 @@ export function Footer() {
         <div className="max-w-sm">
           <Logo />
           <p className="mt-4 text-sm leading-relaxed text-ink-muted">
-            Intelligent campus infrastructure for the next generation of students.
+            Intelligent campus infrastructure for the next generation of students — made only for Ahsanullah University
+            of Science and Technology (AUST), for holders of an @aust.edu account.
           </p>
         </div>
         <nav aria-label="Footer">

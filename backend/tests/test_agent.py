@@ -352,6 +352,14 @@ for text, needle in [("when is my next class?", "CSE"), ("what's due this week?"
     check(f"degraded answers read intent: {text!r}", out is not None and out["reply"], out)
 check("degraded ignores unrelated chatter", degraded.answer("hello there", PROFILE) is None)
 
+# Degraded answers must honour what was actually asked, not just today's date / every priority.
+out = degraded.answer("What classes do I have on Wednesday?", PROFILE)
+check("degraded uses the weekday in the question, not today",
+      out is not None and "weekend" not in out["reply"], out)
+out = degraded.answer("Show me all high priority announcements.", PROFILE)
+check("degraded filters announcements by the requested priority",
+      out is not None and "[medium]" not in out["reply"] and "[low]" not in out["reply"], out)
+
 # ---------------------------------------------------------------- agent loop
 import app.agents.agent as agent_mod  # noqa: E402
 
@@ -397,6 +405,42 @@ execute("DELETE FROM bookings WHERE date='2026-09-21'")
 res, fake = turn("Tell me a joke", [httpx.ReadTimeout("x")] * 8)
 check("agent: total provider outage -> degraded or offline message, never a crash",
       res["agent"] in ("degraded", "assistant") and bool(res["reply"]), res)
+
+# Some free models ignore tool_choice='required' and answer a data question from memory. That is a
+# wrong answer dressed as a right one, so the loop must try another model instead of relaying it.
+res, fake = turn("What assignments do I have due this week?",
+                 [(200, _msg("You have nothing due, relax.")),
+                  (200, _msg(None, _call("list_assignments", {"due_within_days": 7}))),
+                  (200, _msg("Two assignments are due this week."))])
+check("agent: a model that ignores tool_choice=required is retried on another model",
+      res["tool_calls"] and res["tool_calls"][0]["tool"] == "list_assignments", res)
+check("agent: the from-memory answer is never relayed",
+      "relax" not in res["reply"], res["reply"])
+check("agent: the retry actually switched model",
+      fake.calls[0][1] != fake.calls[1][1], fake.calls)
+
+# If no model will call a tool, answer from live data rather than the model's recollection.
+res, fake = turn("What assignments do I have due this week?",
+                 [(200, _msg("Nothing due, trust me.")), (200, _msg("Still nothing due.")),
+                  (200, _msg("Really nothing."))])
+check("agent: no model calls a tool -> grounded fallback, not the hallucination",
+      res["agent"] == "degraded" and "trust me" not in res["reply"], res)
+
+# A weak model can loop on the same tool forever; that wastes the free quota and never answers.
+same = _call("list_announcements", {})
+res, fake = turn("What classes do I have on Wednesday?",
+                 [(200, _msg(None, same)), (200, _msg(None, same)), (200, _msg(None, same)),
+                  (200, _msg(None, same)), (200, _msg(None, same)), (200, _msg(None, same))])
+check("agent: a repeated identical tool call stops the loop",
+      len(res["tool_calls"]) == 1 and bool(res["reply"]), res)
+check("agent: loop stop still answers from what was fetched",
+      "couldn't" not in res["reply"].lower(), res["reply"])
+
+# Weak models sometimes emit a bare '[' instead of prose. Never show that to a student.
+res, fake = turn("What classes do I have on Wednesday?",
+                 [(200, _msg(None, _call("list_schedules", {"day": "Wednesday"}))), (200, _msg("["))])
+check("agent: a degenerate '[' reply is replaced with real content",
+      res["reply"].strip() != "[" and len(res["reply"]) > 12, res["reply"])
 
 res, fake = turn("When is my next class?", [httpx.ReadTimeout("x")] * 8)
 check("agent: outage on a read question falls back to live data",
@@ -505,7 +549,8 @@ agent_mod.gateway = original
 check("agent: stream cut after a complete-looking answer keeps the text",
       "CSE 4129" in res["reply"], res)
 
-from app.ratelimit import PER_MINUTE, _hits, check as rl_check  # noqa: E402
+from app.config import RATE_LIMIT_PER_MINUTE as PER_MINUTE  # noqa: E402
+from app.ratelimit import _hits, check as rl_check  # noqa: E402
 
 
 class _Req:

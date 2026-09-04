@@ -9,8 +9,8 @@ from collections import defaultdict, deque
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-PER_MINUTE = 20
-PER_DAY = 200
+from .config import RATE_LIMIT_PER_DAY, RATE_LIMIT_PER_MINUTE
+
 PROTECTED_PREFIX = "/api/agent"
 
 _hits: dict[str, deque] = defaultdict(deque)
@@ -30,9 +30,9 @@ def check(request: Request) -> tuple[bool, int]:
     while hits and now - hits[0] > 86400:
         hits.popleft()
     last_minute = sum(1 for t in hits if now - t <= 60)
-    if last_minute >= PER_MINUTE:
+    if last_minute >= RATE_LIMIT_PER_MINUTE:
         return False, 60
-    if len(hits) >= PER_DAY:
+    if len(hits) >= RATE_LIMIT_PER_DAY:
         return False, 3600
     hits.append(now)
     return True, 0

@@ -44,6 +44,7 @@ function StatTile({ icon: Icon, label, value, onClick }) {
     <button
       type="button"
       onClick={onClick}
+      aria-label={`${value} ${label}`}
       className="group flex h-full items-center gap-3 self-start rounded-xl border border-line bg-surface px-3.5 py-3 text-left shadow-xs transition-[box-shadow,border-color] duration-200 hover:border-line-strong hover:shadow-sm"
     >
       <span className="grid size-9 place-items-center rounded-lg bg-surface-3 text-ink-2">
@@ -285,8 +286,9 @@ export default function Overview({ onNavigate }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span
+                          title={`${row.course} · ${row.title}`}
                           className={cx(
-                            "block truncate text-sm font-medium",
+                            "block line-clamp-2 text-sm font-medium",
                             done ? "text-ink-2 line-through" : "text-ink",
                           )}
                         >
@@ -322,7 +324,9 @@ export default function Overview({ onNavigate }) {
                 {dueSoon.slice(0, 5).map((row) => (
                   <Row key={row.id}>
                     <Badge tone="accent">{row.course}</Badge>
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.title}</span>
+                    <span title={row.title} className="min-w-0 flex-1 line-clamp-2 text-sm text-ink">
+                      {row.title}
+                    </span>
                     <span
                       className={cx(
                         "shrink-0 text-[13px] font-medium tabular",
@@ -390,7 +394,9 @@ export default function Overview({ onNavigate }) {
                 {upcoming.map((row) => (
                   <Row key={row.id}>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-ink">{row.name}</span>
+                      <span title={row.name} className="block line-clamp-2 text-sm font-medium text-ink">
+                        {row.name}
+                      </span>
                       <span className="block text-[12px] text-ink-3 tabular">
                         {relativeDay(row.date, today)} · {fmtTime(row.start_time)} · {row.venue}
                       </span>

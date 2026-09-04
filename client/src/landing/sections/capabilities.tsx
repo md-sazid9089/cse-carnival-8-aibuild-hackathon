@@ -23,24 +23,24 @@ export function Capabilities() {
             key={c.title}
             variants={staggerItem}
             whileHover="hover"
-            className="group relative overflow-hidden rounded-3xl border border-cream-200 bg-white p-6 shadow-soft transition-shadow hover:shadow-lift"
+            className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-6 shadow-xs transition-shadow hover:shadow-md"
           >
             <motion.span
               aria-hidden
               variants={{ hover: { scale: 1.6, opacity: 0.35 } }}
               initial={{ scale: 1, opacity: 0 }}
               transition={{ type: "spring", stiffness: 180, damping: 20 }}
-              className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-peach/60"
+              className="pointer-events-none absolute -top-8 -right-8 size-32 rounded-full bg-accent-soft"
             />
             <motion.span
               variants={{ hover: { rotate: -6, scale: 1.06 } }}
               transition={{ type: "spring", stiffness: 260, damping: 18 }}
-              className="relative grid size-11 place-items-center rounded-2xl bg-forest-deep text-cream-50"
+              className="relative grid size-11 place-items-center rounded-xl bg-ink text-ink-invert"
             >
               <c.icon className="size-5" aria-hidden />
             </motion.span>
-            <h3 className="relative mt-5 font-display text-2xl font-semibold text-forest-deep">{c.title}</h3>
-            <p className="relative mt-2 text-sm leading-relaxed text-ink-muted">{c.description}</p>
+            <h3 className="relative mt-5 text-xl font-semibold tracking-tight text-ink">{c.title}</h3>
+            <p className="relative mt-2 text-sm leading-relaxed text-ink-2">{c.description}</p>
           </motion.li>
         ))}
       </motion.ul>

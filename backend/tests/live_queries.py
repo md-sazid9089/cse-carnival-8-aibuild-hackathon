@@ -30,7 +30,7 @@ only = sys.argv[1] if len(sys.argv) > 1 else None
 client = httpx.Client(base_url=B, timeout=180)
 
 # The agent endpoint needs a session. Sign in if the harness account exists, else register it.
-EMAIL = os.getenv("CAMPUSOS_EMAIL", "live.rubric@aust.edu")
+EMAIL = os.getenv("CAMPUSOS_EMAIL", "cse.20250001@aust.edu")
 PW = os.getenv("CAMPUSOS_PW", "live-rubric-pass")
 res = client.post("/api/auth/signin", json={"email_or_id": EMAIL, "password": PW})
 if res.status_code != 200:

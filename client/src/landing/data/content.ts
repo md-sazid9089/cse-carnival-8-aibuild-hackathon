@@ -44,11 +44,11 @@ export const CAMPUS_SYSTEMS: CampusSystem[] = [
 ];
 
 export const SCATTERED_SOURCES = [
-  { label: "Group chat", detail: "“anyone know if CSE321 is on today??”", tint: "bg-white" },
-  { label: "Spreadsheet", detail: "routine_v3_FINAL(2).xlsx", tint: "bg-cream-100" },
-  { label: "Notice board", detail: "Pinned 3 weeks ago", tint: "bg-peach/50" },
-  { label: "Class schedule", detail: "Photo of a photo of a PDF", tint: "bg-sage/30" },
-  { label: "Event poster", detail: "Seen once in a hallway", tint: "bg-white" },
+  { label: "Group chat", detail: "“anyone know if CSE321 is on today??”", tint: "bg-surface" },
+  { label: "Spreadsheet", detail: "routine_v3_FINAL(2).xlsx", tint: "bg-surface-2" },
+  { label: "Notice board", detail: "Pinned 3 weeks ago", tint: "bg-accent-soft" },
+  { label: "Class schedule", detail: "Photo of a photo of a PDF", tint: "bg-surface-3" },
+  { label: "Event poster", detail: "Seen once in a hallway", tint: "bg-surface" },
 ] as const;
 
 export type Conversation = {

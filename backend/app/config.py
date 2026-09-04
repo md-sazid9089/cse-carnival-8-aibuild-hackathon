@@ -51,6 +51,10 @@ AGENT_HISTORY_TURNS = _int("AGENT_HISTORY_TURNS", 12)
 AGENT_DAILY_CAP = _int("AGENT_DAILY_CAP", 800)
 AGENT_DEGRADED_MODE = os.getenv("AGENT_DEGRADED_MODE", "1") == "1"
 
+# Per-visitor ceiling on agent calls, so one client cannot drain the shared free quota.
+RATE_LIMIT_PER_MINUTE = _int("RATE_LIMIT_PER_MINUTE", 20)
+RATE_LIMIT_PER_DAY = _int("RATE_LIMIT_PER_DAY", 200)
+
 EMBEDDINGS_ENABLED = os.getenv("EMBEDDINGS_ENABLED", "1") == "1"
 TZ_NAME = os.getenv("TZ_NAME", "Asia/Dhaka")
 DEPARTMENT = os.getenv("DEPARTMENT", "CSE")

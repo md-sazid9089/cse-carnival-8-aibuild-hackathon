@@ -17,8 +17,8 @@ const ROOMS = ["7A01", "7A02", "7A03", "7A04", "7A05", "7B01", "7B02", "7B03", "
 
 function Tile({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-cream-200 bg-white p-4", className)}>
-      <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">{title}</p>
+    <div className={cn("rounded-xl border border-line bg-surface p-4", className)}>
+      <p className="mb-2.5 text-[10px] font-semibold tracking-[0.14em] uppercase text-ink-3">{title}</p>
       {children}
     </div>
   );
@@ -68,14 +68,14 @@ export function DashboardPreview() {
               initial={{ opacity: 0, y: -12, x: 12 }}
               animate={{ opacity: 1, y: 0, x: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="absolute right-4 top-4 z-10 flex items-center gap-2.5 rounded-2xl border border-cream-200 bg-white px-4 py-3 shadow-lift"
+              className="absolute top-4 right-4 z-10 flex items-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg"
             >
-              <span className="grid size-8 place-items-center rounded-full bg-peach/60 text-terracotta-deep">
+              <span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent-ink">
                 <Bell className="size-4" aria-hidden />
               </span>
               <div>
-                <p className="text-xs font-semibold text-forest-deep">New announcement</p>
-                <p className="text-[11px] text-ink-muted">Library hours extended this week</p>
+                <p className="text-xs font-semibold text-ink">New announcement</p>
+                <p className="text-[11px] text-ink-3">Library hours extended this week</p>
               </div>
             </motion.div>
           )}
@@ -86,22 +86,22 @@ export function DashboardPreview() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-10% 0px" }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="overflow-hidden rounded-3xl border border-cream-200 bg-cream-50 shadow-lift"
+          className="overflow-hidden rounded-2xl border border-line bg-canvas shadow-lg"
         >
-          <div className="flex items-center justify-between border-b border-cream-200 bg-white/70 px-5 py-3">
+          <div className="flex items-center justify-between border-b border-line bg-surface/70 px-5 py-3">
             <div>
-              <p className="text-sm font-semibold text-forest-deep">Good afternoon, Sakibul</p>
-              <p className="text-[11px] text-ink-muted">Thursday · 3 classes · 2 deadlines this week</p>
+              <p className="text-sm font-semibold text-ink">Good afternoon, Sakibul</p>
+              <p className="text-[11px] text-ink-3">Thursday · 3 classes · 2 deadlines this week</p>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-cream-200 bg-cream-50 px-3 py-1.5">
-              <Sparkles className={cn("size-3.5", aiState === 1 ? "animate-pulse text-terracotta" : "text-moss")} aria-hidden />
+            <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
+              <Sparkles className={cn("size-3.5", aiState === 1 ? "animate-pulse text-accent" : "text-ink-3")} aria-hidden />
               <AnimatePresence mode="wait">
                 <motion.span
                   key={aiState}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="text-[11px] font-medium text-forest"
+                  className="text-[11px] font-medium text-ink-2"
                 >
                   {AI_STATES[aiState]}
                 </motion.span>
@@ -117,30 +117,30 @@ export function DashboardPreview() {
                     key={s.course}
                     className={cn(
                       "flex items-center gap-3 rounded-xl px-3 py-2 text-xs",
-                      s.next ? "bg-forest-deep text-cream-50" : "bg-cream-50 text-forest-deep",
+                      s.next ? "bg-ink text-ink-invert" : "bg-surface-2 text-ink",
                       s.past && "opacity-50",
                     )}
                   >
                     <span className="font-mono">{s.time}</span>
                     <span className="font-semibold">{s.course}</span>
-                    {s.next && <span className="rounded-full bg-terracotta px-2 py-0.5 text-[10px] font-bold">Next</span>}
-                    <span className={cn("ml-auto font-mono", s.next ? "text-sage" : "text-ink-muted")}>{s.room}</span>
+                    {s.next && <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-semibold">Next</span>}
+                    <span className={cn("ml-auto font-mono", s.next ? "text-ink-invert/60" : "text-ink-3")}>{s.room}</span>
                   </li>
                 ))}
               </ul>
             </Tile>
 
             <Tile title="Next class">
-              <p className="font-display text-3xl font-semibold text-forest-deep">14:00</p>
-              <p className="mt-1 text-xs font-semibold text-forest-deep">IPE 4111 · Industrial Management</p>
-              <p className="text-xs text-ink-muted">Room 7C01 · starts in 1h 12m</p>
+              <p className="text-3xl font-semibold tracking-tight text-ink tabular">14:00</p>
+              <p className="mt-1 text-xs font-semibold text-ink">IPE 4111 · Industrial Management</p>
+              <p className="text-xs text-ink-3">Room 7C01 · starts in 1h 12m</p>
             </Tile>
 
             <Tile title="Deadlines">
               <ul className="space-y-1.5 text-xs">
-                <li className="flex justify-between"><span>Compiler lab report</span><span className="font-semibold text-terracotta">2 days</span></li>
-                <li className="flex justify-between"><span>ML assignment 2</span><span className="text-ink-muted">5 days</span></li>
-                <li className="flex justify-between"><span>Cyber Security quiz</span><span className="text-ink-muted">6 days</span></li>
+                <li className="flex justify-between"><span>Compiler lab report</span><span className="font-semibold text-accent">2 days</span></li>
+                <li className="flex justify-between"><span>ML assignment 2</span><span className="text-ink-3">5 days</span></li>
+                <li className="flex justify-between"><span>Cyber Security quiz</span><span className="text-ink-3">6 days</span></li>
               </ul>
             </Tile>
 
@@ -152,12 +152,12 @@ export function DashboardPreview() {
                     <motion.div
                       key={r}
                       layout
-                      animate={{ backgroundColor: busy ? "rgba(185,120,97,0.18)" : "rgba(169,184,172,0.28)" }}
+                      animate={{ backgroundColor: busy ? "var(--critical-soft)" : "var(--positive-soft)" }}
                       transition={{ duration: 0.4 }}
-                      className="flex items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[11px] text-forest-deep"
+                      className="flex items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[11px] text-ink"
                     >
                       {r}
-                      <span className={cn("size-1.5 rounded-full", busy ? "bg-terracotta" : "bg-moss")} aria-label={busy ? "busy" : "free"} />
+                      <span className={cn("size-1.5 rounded-full", busy ? "bg-critical" : "bg-positive")} aria-label={busy ? "busy" : "free"} />
                     </motion.div>
                   );
                 })}
