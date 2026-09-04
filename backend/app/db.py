@@ -47,6 +47,19 @@ def next_id(table: str, prefix: str) -> str:
 
 def migrate() -> None:
     pool.open()
+    with pool.connection() as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS schema_migrations (
+                   filename TEXT PRIMARY KEY,
+                   applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+               )"""
+        )
+        applied = {r["filename"] for r in conn.execute("SELECT filename FROM schema_migrations").fetchall()}
+
     for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        with pool.connection() as conn:
+        if path.name in applied:
+            continue
+        with pool.connection() as conn:  # one transaction per migration file
             conn.execute(path.read_text(encoding="utf-8"))
+            conn.execute("INSERT INTO schema_migrations (filename) VALUES (%s)", [path.name])
+        print(f"[migrate] applied {path.name}")
