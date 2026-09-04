@@ -62,5 +62,12 @@ async def unhandled_error_handler(request: Request, exc: Exception):
 
 app.include_router(router)
 
+
+@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def api_not_found(path: str):
+    # keeps unknown /api/* paths as JSON 404 instead of falling through to the SPA index.html
+    return JSONResponse(status_code=404, content={"error": "NOT_FOUND", "detail": f"/api/{path} does not exist"})
+
+
 if CLIENT_DIST.exists():
     app.mount("/", StaticFiles(directory=CLIENT_DIST, html=True), name="client")

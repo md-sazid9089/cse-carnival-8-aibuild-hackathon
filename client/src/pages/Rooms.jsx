@@ -9,7 +9,7 @@ const columns = [
   { key: "room_number", label: "Room" },
   { key: "type", label: "Type" },
   { key: "capacity", label: "Capacity" },
-  { key: "equipment", label: "Equipment", render: (r) => r.equipment.join(", ") },
+  { key: "equipment", label: "Equipment", wrap: true, render: (r) => r.equipment.join(", ") },
   { key: "status", label: "Status", render: badge("status") },
   { key: "bookings", label: "Bookings", render: (r) => `${r.bookings.length}` },
 ];
@@ -37,7 +37,7 @@ export default function Rooms({ profile }) {
 
   const book = async (form) => {
     try {
-      await api.post(`/api/rooms/${bookingRoom.id}/bookings`, { ...form, booked_by: profile.name });
+      await api.post(`/api/rooms/${bookingRoom.id}/bookings`, form);
       toast(`Room ${bookingRoom.room_number} booked`, "success"); setBookingRoom(null); refresh();
     } catch (e) { toast(e.message, "error"); }
   };
@@ -45,7 +45,7 @@ export default function Rooms({ profile }) {
   const cancelBooking = async (room, b) => {
     if (!confirm(`Cancel booking ${b.booking_id}?`)) return;
     try {
-      await api.del(`/api/rooms/${room.id}/bookings/${b.booking_id}?booked_by=${encodeURIComponent(profile.name)}`);
+      await api.del(`/api/rooms/${room.id}/bookings/${b.booking_id}`);
       toast("Booking cancelled", "success"); refresh();
     } catch (e) { toast(e.message, "error"); }
   };
