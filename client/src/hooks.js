@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api.js";
+import { API_BASE, api } from "./api.js";
 
 export function useApi(path) {
   const [data, setData] = useState(null);
@@ -19,7 +19,7 @@ export function useSSE(entity, onChange) {
   const cbRef = useRef(onChange);
   cbRef.current = onChange;
   useEffect(() => {
-    const es = new EventSource("/api/stream");
+    const es = new EventSource(API_BASE + "/api/stream");
     es.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);

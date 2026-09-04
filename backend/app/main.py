@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import sse
-from .config import CLIENT_DIST
+from .config import ALLOWED_ORIGINS, CLIENT_DIST
 from .db import migrate
 from .routers.api import router
 from .search.embedder import warmup_async
@@ -36,7 +36,7 @@ app = FastAPI(title="CampusOS", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

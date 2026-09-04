@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
 import { setProfile as setApiProfile } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
@@ -9,12 +10,12 @@ import ResourcePage from "./pages/ResourcePage.jsx";
 import Rooms from "./pages/Rooms.jsx";
 
 const NAV = [
-  { id: "overview", label: "Overview", icon: "🏠" },
-  { id: "schedules", label: "Schedules", icon: "📅" },
-  { id: "rooms", label: "Rooms", icon: "🚪" },
-  { id: "events", label: "Events", icon: "🎪" },
-  { id: "announcements", label: "Announcements", icon: "📢" },
-  { id: "assignments", label: "Assignments", icon: "📝" },
+  { id: "overview", label: "Overview", icon: FiHome },
+  { id: "schedules", label: "Schedules", icon: FiCalendar },
+  { id: "rooms", label: "Rooms", icon: FiGrid },
+  { id: "events", label: "Events", icon: FiFlag },
+  { id: "announcements", label: "Announcements", icon: FiBell },
+  { id: "assignments", label: "Assignments", icon: FiFileText },
 ];
 
 const PROFILES = [
@@ -40,7 +41,7 @@ export default function App() {
           <button key={n.id} onClick={() => setTab(n.id)}
                   className={`text-left px-4 py-2.5 text-sm flex gap-2 items-center ${
                     tab === n.id ? "bg-slate-800 text-white border-l-2 border-indigo-500" : "hover:bg-slate-800/50"}`}>
-            <span>{n.icon}</span> {n.label}
+            <n.icon className="shrink-0" /> {n.label}
           </button>
         ))}
         <div className="mt-auto p-4">

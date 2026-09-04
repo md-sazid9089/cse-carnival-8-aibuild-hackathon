@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: campusos-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/meta
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_URL
+        sync: false # paste your Postgres URL (Neon free tier works; needs pgvector)
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: z-ai/glm-5.2:free
+      - key: OPENROUTER_ROUTER_MODEL
+        value: nvidia/nemotron-3.5-lightning:free
+      - key: ALLOWED_ORIGINS
+        sync: false # your Vercel URL, e.g. https://campusos.vercel.app
+      - key: EMBEDDINGS_ENABLED
+        value: "1" # set to "0" if the instance runs out of memory
+      - key: TZ_NAME
+        value: Asia/Dhaka

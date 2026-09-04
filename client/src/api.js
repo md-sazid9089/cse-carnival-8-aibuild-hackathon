@@ -1,3 +1,6 @@
+// Deployed frontend (e.g. Vercel) points at the hosted backend; empty = same-origin/Vite proxy
+export const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+
 let currentProfile = { student_id: "20-40532", name: "Sakibul Hassan" };
 export function setProfile(p) {
   currentProfile = p;
@@ -9,7 +12,7 @@ async function request(method, path, body) {
     "X-Student-Name": currentProfile.name,
   };
   if (body) headers["Content-Type"] = "application/json";
-  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(API_BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
   return data;

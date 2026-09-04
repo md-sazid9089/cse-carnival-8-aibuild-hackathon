@@ -8,6 +8,7 @@ env/
 
 # Environment
 .env
+backend/.env
 *.env.local
 
 # Build outputs
