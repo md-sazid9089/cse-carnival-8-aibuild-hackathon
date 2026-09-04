@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { FiCheck, FiX } from "react-icons/fi";
 import { api } from "../api.js";
 
 const SUGGESTIONS = [
@@ -36,7 +37,7 @@ export default function ChatPanel({ profile }) {
       });
       setMessages([...history, { role: "assistant", content: res.reply, agent: res.agent, tool_calls: res.tool_calls }]);
     } catch (e) {
-      setMessages([...history, { role: "assistant", content: `⚠ ${e.message}`, agent: "error" }]);
+      setMessages([...history, { role: "assistant", content: e.message, agent: "error" }]);
     } finally {
       setBusy(false);
       setTimeout(() => scrollRef.current?.scrollTo(0, 1e6), 50);
@@ -72,8 +73,8 @@ export default function ChatPanel({ profile }) {
             {m.tool_calls?.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-1">
                 {m.tool_calls.map((t, j) => (
-                  <span key={j} className={`text-[10px] px-2 py-0.5 rounded-full border ${t.ok ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}`}>
-                    {t.ok ? "✓" : "✗"} {t.tool}
+                  <span key={j} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${t.ok ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}`}>
+                    {t.ok ? <FiCheck /> : <FiX />} {t.tool}
                   </span>
                 ))}
               </div>

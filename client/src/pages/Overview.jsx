@@ -1,3 +1,4 @@
+import { FiAlertTriangle } from "react-icons/fi";
 import { useApi, useSSE } from "../hooks.js";
 
 function Card({ title, children }) {
@@ -37,9 +38,9 @@ export default function Overview() {
               <span><b>{s.course}</b> · {s.title}</span>
               <span className="text-slate-500">{s.start_time}–{s.end_time} · {s.room}</span>
             </div>
-          )) : <div className="text-slate-400">No classes today 🎉</div>}
+          )) : <div className="text-slate-400">No classes today</div>}
           {highPriority.length > 0 && (
-            <div className="text-xs text-amber-600 pt-1">⚠ Check announcements — {highPriority.length} high-priority notice(s) may affect classes.</div>
+            <div className="flex items-center gap-1 text-xs text-amber-600 pt-1"><FiAlertTriangle className="shrink-0" /> Check announcements — {highPriority.length} high-priority notice(s) may affect classes.</div>
           )}
         </Card>
         <Card title="Due This Week">
