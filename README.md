@@ -125,7 +125,7 @@ npm run dev
 
 Go to **[http://localhost:5173](http://localhost:5173)** — Vite proxies `/api` to the backend on port 8000.
 
-**Create an account with "Sign up"** (any email + a password of at least 6 characters). CampusOS requires sign-in so that every booking and registration has a real owner. To instead sign in as a student who _already_ owns seed bookings, set `SEED_USER_PASSWORD` in `.env`, restart the backend, and use that password with `sakibul.hassan@aust.edu`.
+**Create an account with "Sign up"** — CampusOS requires sign-in so that every booking and registration has a real owner. Any `name.department.studentid@aust.edu` address works, and a new account starts on the full cohort timetable. To sign in as a student who already owns seed data and has a routine of their own, use one of the [demo accounts](#demo-accounts) below.
 
 <details>
 <summary><b>Alternative: one command for both servers</b></summary>
@@ -161,7 +161,43 @@ python tests/test_enrollments.py # per-student routines: two students, two diffe
 
 ---
 
-## 🔐 Environment Variables
+## � Demo accounts
+
+[`data/enrollments.json`](data/enrollments.json) registers eight students for different courses, so **the app is not the same for everyone**: sign in as two of them and the dashboard, the timetable and the agent's answer to _"what's my next class?"_ all change.
+
+Set the shared password once, then restart the backend — it hashes the accounts on boot:
+
+```bash
+# .env
+SEED_USER_PASSWORD=campusos2026
+```
+
+Sign in with **either the student ID or the email**, plus that password.
+
+| Student ID | Email                                      | Name               | Track                   | Their week    |
+| ---------- | ------------------------------------------ | ------------------ | ----------------------- | ------------- |
+| `20-40532` | `sakibul.hassan.cse.20-40532@aust.edu`     | Sakibul Hassan     | Cyber Security          | 20 classes    |
+| `20-40498` | `tasnia.islam.cse.20-40498@aust.edu`       | Tasnia Islam       | Cyber Security          | 20 classes    |
+| `20-40523` | `ashiqur.rahman.cse.20-40523@aust.edu`     | Ashiqur Rahman     | Cyber Security          | 20 classes    |
+| `20-40511` | `farhan.ahmed.cse.20-40511@aust.edu`       | Farhan Ahmed       | Data Warehousing        | 20 classes    |
+| `20-40476` | `nusrat.jahan.mim.cse.20-40476@aust.edu`   | Nusrat Jahan Mim   | Data Warehousing        | 20 classes    |
+| `20-40560` | `mehjabin.chowdhury.cse.20-40560@aust.edu` | Mehjabin Chowdhury | Data Warehousing        | 20 classes    |
+| `21-41188` | `shafayet.karim.cse.21-41188@aust.edu`     | Shafayet Karim     | Reduced load            | **9 classes** |
+| `21-41205` | `rafi.hossain.cse.21-41205@aust.edu`       | Rafi Hossain       | Repeating three courses | **7 classes** |
+
+**A two-minute demo that shows the data is live, not staged**
+
+1. Sign in as **Sakibul Hassan** (`20-40532`). Overview reads _"Your classes on …"_; on Schedules, flip the **All classes / My classes** toggle — 20 of the timetable's 24 rows are his.
+2. Ask the agent **"what's my next class?"** and note the answer.
+3. Sign out and sign in as **Rafi Hossain** (`21-41205`). His week is 7 classes, and the same question gives a different answer — he only takes Compilers and Industrial Management.
+4. Ask **"do I have Cyber Security?"** as each of them. The two elective tracks never share those classes.
+5. Book a room as one of them, then sign in as the other and try to cancel it: the API answers `403`. You may only cancel what you created.
+
+> The accounts share one password on purpose, so the demo is reproducible. On a public deployment leave `SEED_USER_PASSWORD` unset — the seeded accounts then exist only to own their seed bookings, and nobody can sign in as them.
+
+---
+
+## �🔐 Environment Variables
 
 Copy [`.env.example`](.env.example) → `.env` in the repository root. **Never commit `.env`** — it is git-ignored, and `.env.example` ships with empty placeholders only.
 
@@ -195,7 +231,7 @@ Copy [`.env.example`](.env.example) → `.env` in the repository root. **Never c
 | `EMAIL_DOMAIN`                                      | `aust.edu`                                | Domain used to build email addresses for accounts seeded from `data/*.json`                                                     |
 | `AUTH_SECRET`                                       | random per process                        | Session-token signing key. Unset means a restart signs everyone out. **Mandatory when `APP_ENV=production`.**                   |
 | `AUTH_TOKEN_TTL_S`                                  | `43200`                                   | Session lifetime in seconds (12 h)                                                                                              |
-| `SEED_USER_PASSWORD`                                | _(unset)_                                 | Shared password for the people named in `data/*.json`. Unset = those accounts cannot sign in, and you register your own instead |
+| `SEED_USER_PASSWORD`                                | _(unset)_                                 | Shared password for the students named in `data/enrollments.json` — see [Demo accounts](#demo-accounts). Unset = those accounts cannot sign in, and you register your own instead |
 | `ALLOWED_ORIGINS`                                   | _(none)_                                  | Extra CORS origins for a separately hosted frontend, comma-separated                                                            |
 | `PORT` / `APP_URL`                                  | `8000` / `http://localhost:8000`          | Bind port and public URL                                                                                                        |
 
