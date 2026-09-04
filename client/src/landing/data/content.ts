@@ -20,8 +20,9 @@ export const NAV_LINKS = [
   { label: "AI Agent", href: "#ai-agent" },
 ] as const;
 
-export const APP_PATH = "/overview";
+export const APP_PATH = "/dashboard";
 export const SIGN_IN_PATH = "/auth/signin";
+export const SIGN_UP_PATH = "/auth/signup";
 
 export type CampusSystem = {
   id: "schedule" | "rooms" | "events" | "announcements" | "assignments";

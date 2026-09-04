@@ -78,7 +78,7 @@ export default function SignUp({ onNavigate, onSuccess }) {
       setAuth(res.user, res.token);
       toast(`Account created — welcome, ${res.user.name}`, "success");
       if (onSuccess) onSuccess(res.user);
-      else onNavigate?.("overview");
+      else onNavigate?.("/dashboard");
     } catch (err) {
       setFormError(err.message || "We couldn't create your account. Please try again.");
     } finally {
@@ -91,12 +91,13 @@ export default function SignUp({ onNavigate, onSuccess }) {
       eyebrow="Get started"
       title="Create your student account"
       subtitle="Takes a minute. You'll get your routine, room booking, event registration and the assistant."
+      onHome={() => onNavigate?.("/")}
       footer={
         <>
           Already have an account?{" "}
           <button
             type="button"
-            onClick={() => onNavigate?.("signin")}
+            onClick={() => onNavigate?.("/auth/signin")}
             className="font-medium text-accent underline-offset-2 hover:underline"
           >
             Sign in

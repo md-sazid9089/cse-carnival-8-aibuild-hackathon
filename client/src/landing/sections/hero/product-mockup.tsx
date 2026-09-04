@@ -91,7 +91,7 @@ export function ProductMockup() {
           <span className="size-2.5 rounded-full bg-cream-200" />
           <span className="size-2.5 rounded-full bg-cream-200" />
           <span className="ml-3 rounded-md bg-cream-100 px-2 py-0.5 text-[10px] font-medium text-ink-muted">
-            campusos.app/overview
+            campusos.app/dashboard
           </span>
         </div>
 

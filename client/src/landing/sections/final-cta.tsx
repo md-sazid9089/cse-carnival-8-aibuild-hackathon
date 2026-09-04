@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Container } from "../components/section";
 import { Reveal } from "../components/reveal";
-import { APP_PATH } from "../data/content";
+import { SIGN_UP_PATH } from "../data/content";
 import { scrollToHash, useNavigate } from "../hooks/use-navigate";
 
 /** Abstract campus network: a few nodes joined by faint arcs, drawn in on view. */
@@ -59,7 +59,7 @@ export function FinalCta() {
               One platform for campus data. One AI agent for everything you need to know and do.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button size="lg" variant="accent" onClick={() => navigate(APP_PATH)} className="w-full sm:w-auto">
+              <Button size="lg" variant="accent" onClick={() => navigate(SIGN_UP_PATH)} className="w-full sm:w-auto">
                 Get Started
                 <ArrowRight className="size-4" aria-hidden />
               </Button>

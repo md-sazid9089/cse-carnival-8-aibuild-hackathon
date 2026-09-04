@@ -70,8 +70,12 @@ function NavList({ tab, onSelect }) {
   );
 }
 
-function AccountCard() {
+function AccountCard({ onSignOut }) {
   const { profile, account, signOut } = useCampus();
+  const handleSignOut = () => {
+    signOut();
+    onSignOut?.();
+  };
   return (
     <div className="rounded-xl border border-line bg-surface-2 p-2.5">
       <div className="mb-2 flex items-center gap-2.5">
@@ -85,14 +89,14 @@ function AccountCard() {
           </span>
         </span>
       </div>
-      <Button size="sm" variant="ghost" className="w-full" onClick={signOut}>
+      <Button size="sm" variant="ghost" className="w-full" onClick={handleSignOut}>
         Sign out
       </Button>
     </div>
   );
 }
 
-function Shell() {
+function Shell({ onSignOut }) {
   const [tab, setTab] = useState("overview");
   const [navQuery, setNavQuery] = useState("");
   const [navKey, setNavKey] = useState(0);
@@ -168,7 +172,7 @@ function Shell() {
               <Kbd>K</Kbd>
             </span>
           </button>
-          <AccountCard />
+          <AccountCard onSignOut={onSignOut} />
         </div>
       </aside>
 
@@ -189,7 +193,7 @@ function Shell() {
             </div>
             <NavList tab={tab} onSelect={navigate} />
             <div className="mt-auto pt-4">
-              <AccountCard />
+              <AccountCard onSignOut={onSignOut} />
             </div>
           </div>
         </div>
@@ -234,49 +238,134 @@ function Shell() {
   );
 }
 
-/** Nothing is readable without an identity: the whole dashboard is scoped to the signed-in account. */
-function Gate({ initialView = "signin" }) {
-  const { account } = useCampus();
-  const [view, setView] = useState(initialView);
+const ROUTE_LANDING = "/";
+const ROUTE_SIGNIN = "/auth/signin";
+const ROUTE_SIGNUP = "/auth/signup";
+const ROUTE_DASHBOARD = "/dashboard";
 
-  if (account) return <Shell />;
-
-  const Page = view === "signup" ? SignUp : SignIn;
-  return (
-    <>
-      <Page onNavigate={(target) => setView(target === "signup" ? "signup" : "signin")} onSuccess={() => setView("signin")} />
-      <Toast />
-    </>
-  );
+function normalizeRoute(pathname) {
+  const clean = (pathname || "/").replace(/\/+$/, "") || "/";
+  if (clean === "/" || clean === "") return ROUTE_LANDING;
+  if (clean === "/auth/signin" || clean === "/signin") return ROUTE_SIGNIN;
+  if (clean === "/auth/signup" || clean === "/signup" || clean === "/register") return ROUTE_SIGNUP;
+  if (clean === "/dashboard" || clean === "/overview" || clean === "/app") return ROUTE_DASHBOARD;
+  return clean;
 }
 
-const isLandingPath = (pathname) => pathname === "/" || pathname === "";
+function AppRouter() {
+  const { account } = useCampus();
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
 
-export default function App() {
-  // "/" is the marketing page; every other path drops into the gated app.
-  const [entered, setEntered] = useState(() => !isLandingPath(window.location.pathname));
-  const [initialView, setInitialView] = useState(() =>
-    /signup|register/i.test(window.location.pathname) ? "signup" : "signin",
-  );
-
+  // Sync state when browser Back/Forward is clicked
   useEffect(() => {
-    const onPop = () => setEntered(!isLandingPath(window.location.pathname));
+    const onPop = () => {
+      setCurrentPath(window.location.pathname);
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const enter = (path) => {
-    window.history.pushState(null, "", path);
-    setInitialView(/signup|register/i.test(path) ? "signup" : "signin");
-    setEntered(true);
+  const navigate = useCallback((to, { replace = false } = {}) => {
+    let target = to;
+    if (target === "signin" || target === "/signin") target = ROUTE_SIGNIN;
+    else if (target === "signup" || target === "/signup" || target === "register" || target === "/register") target = ROUTE_SIGNUP;
+    else if (target === "overview" || target === "dashboard" || target === "/dashboard" || target === "/overview") target = ROUTE_DASHBOARD;
+    else if (target === "home" || target === "/") target = ROUTE_LANDING;
+
+    if (window.location.pathname !== target) {
+      if (replace) {
+        window.history.replaceState(null, "", target);
+      } else {
+        window.history.pushState(null, "", target);
+      }
+    }
+    setCurrentPath(target);
     window.scrollTo({ top: 0 });
-  };
+  }, []);
 
-  if (!entered) return <LandingPage onNavigate={enter} />;
+  const route = normalizeRoute(currentPath);
 
+  // Normalize legacy or aliased URLs in the browser address bar
+  useEffect(() => {
+    if (route === ROUTE_SIGNIN && window.location.pathname !== ROUTE_SIGNIN) {
+      window.history.replaceState(null, "", ROUTE_SIGNIN);
+    } else if (route === ROUTE_SIGNUP && window.location.pathname !== ROUTE_SIGNUP) {
+      window.history.replaceState(null, "", ROUTE_SIGNUP);
+    } else if (route === ROUTE_DASHBOARD && window.location.pathname !== ROUTE_DASHBOARD) {
+      window.history.replaceState(null, "", ROUTE_DASHBOARD);
+    }
+  }, [route]);
+
+  // If already logged in and visiting sign in or sign up, redirect to dashboard
+  useEffect(() => {
+    if (account && (route === ROUTE_SIGNIN || route === ROUTE_SIGNUP)) {
+      navigate(ROUTE_DASHBOARD, { replace: true });
+    }
+  }, [account, route, navigate]);
+
+  // If signed out and accessing dashboard, redirect to sign in
+  useEffect(() => {
+    if (!account && route === ROUTE_DASHBOARD) {
+      navigate(ROUTE_SIGNIN, { replace: true });
+    }
+  }, [account, route, navigate]);
+
+  if (route === ROUTE_LANDING) {
+    return <LandingPage onNavigate={navigate} />;
+  }
+
+  if (route === ROUTE_SIGNUP) {
+    if (account) return <Shell onSignOut={() => navigate(ROUTE_SIGNIN, { replace: true })} />;
+    return (
+      <>
+        <SignUp
+          onNavigate={(target) => navigate(target)}
+          onSuccess={() => navigate(ROUTE_DASHBOARD)}
+        />
+        <Toast />
+      </>
+    );
+  }
+
+  if (route === ROUTE_SIGNIN) {
+    if (account) return <Shell onSignOut={() => navigate(ROUTE_SIGNIN, { replace: true })} />;
+    return (
+      <>
+        <SignIn
+          onNavigate={(target) => navigate(target)}
+          onSuccess={() => navigate(ROUTE_DASHBOARD)}
+        />
+        <Toast />
+      </>
+    );
+  }
+
+  if (route === ROUTE_DASHBOARD) {
+    if (!account) {
+      return (
+        <>
+          <SignIn
+            onNavigate={(target) => navigate(target)}
+            onSuccess={() => navigate(ROUTE_DASHBOARD)}
+          />
+          <Toast />
+        </>
+      );
+    }
+    return <Shell onSignOut={() => navigate(ROUTE_SIGNIN, { replace: true })} />;
+  }
+
+  // Any other route: if signed in, show dashboard; if signed out, show landing
+  if (account) {
+    return <Shell onSignOut={() => navigate(ROUTE_SIGNIN, { replace: true })} />;
+  }
+  return <LandingPage onNavigate={navigate} />;
+}
+
+export default function App() {
   return (
     <CampusProvider>
-      <Gate initialView={initialView} />
+      <AppRouter />
     </CampusProvider>
   );
 }
