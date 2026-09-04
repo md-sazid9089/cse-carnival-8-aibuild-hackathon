@@ -174,7 +174,6 @@ def booking_cancel(rid: str, booking_id: str,
                    x_student_name: str | None = Header(default=None),
                    authorization: str | None = Header(default=None)):
     who = _identity(x_student_id, x_student_name, authorization)
-    return rooms.cancel_booking(booking_id, requested_by=who["name"], full_access=True)
     return rooms.cancel_booking(booking_id, requested_by=who["name"])
 
 
