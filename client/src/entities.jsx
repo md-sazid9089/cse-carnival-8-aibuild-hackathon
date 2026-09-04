@@ -17,7 +17,7 @@ export const entities = {
     title: "Class Schedules",
     endpoint: "/api/schedules",
     columns: [
-      { key: "course", label: "Course" }, { key: "title", label: "Title" }, { key: "day", label: "Day" },
+      { key: "course", label: "Course" }, { key: "title", label: "Title", wrap: true }, { key: "day", label: "Day" },
       { key: "start_time", label: "Start" }, { key: "end_time", label: "End" }, { key: "room", label: "Room" },
       { key: "instructor", label: "Instructor" }, { key: "section", label: "Section" },
     ],
@@ -32,7 +32,7 @@ export const entities = {
     title: "Announcements",
     endpoint: "/api/announcements",
     columns: [
-      { key: "title", label: "Title" },
+      { key: "title", label: "Title", wrap: true },
       { key: "priority", label: "Priority", render: badge("priority") },
       { key: "date", label: "Posted" }, { key: "expires", label: "Expires" }, { key: "posted_by", label: "By" },
     ],
@@ -47,7 +47,7 @@ export const entities = {
     title: "Assignments",
     endpoint: "/api/assignments",
     columns: [
-      { key: "course", label: "Course" }, { key: "title", label: "Title" },
+      { key: "course", label: "Course" }, { key: "title", label: "Title", wrap: true },
       { key: "deadline", label: "Deadline" },
       { key: "status", label: "Status", render: badge("status") },
       { key: "submission_platform", label: "Submit via" }, { key: "marks", label: "Marks" },
@@ -76,7 +76,7 @@ export const roomFields = [
 export const eventFields = [
   { key: "name", label: "Event name", wide: true },
   { key: "description", label: "Description", type: "textarea", wide: true },
-  { key: "date", label: "Date", type: "date" }, { key: "end_date", label: "End date", type: "date" },
+  { key: "date", label: "Date", type: "date" }, { key: "end_date", label: "End date (optional)", type: "date", optional: true },
   { key: "start_time", label: "Start", type: "time" }, { key: "end_time", label: "End", type: "time" },
   { key: "venue", label: "Venue (room)" }, { key: "organizer", label: "Organizer" },
   { key: "capacity", label: "Capacity", type: "number" },

@@ -14,13 +14,16 @@ const AGENT_COLORS = {
   router: "bg-slate-200 text-slate-700",
   analyst: "bg-indigo-100 text-indigo-700",
   coordinator: "bg-emerald-100 text-emerald-700",
+  error: "bg-rose-100 text-rose-700",
 };
 
-export default function ChatPanel({ profile }) {
+export default function ChatPanel({ profile, open = true, onToggle }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
+
+  const scrollToEnd = () => setTimeout(() => scrollRef.current?.scrollTo(0, 1e6), 50);
 
   const send = async (text) => {
     const content = (text ?? input).trim();
@@ -29,6 +32,7 @@ export default function ChatPanel({ profile }) {
     const history = [...messages, { role: "user", content }];
     setMessages(history);
     setBusy(true);
+    scrollToEnd();
     try {
       const res = await api.post("/api/agent/chat", {
         messages: history.map(({ role, content }) => ({ role, content })),
@@ -39,15 +43,27 @@ export default function ChatPanel({ profile }) {
       setMessages([...history, { role: "assistant", content: `⚠ ${e.message}`, agent: "error" }]);
     } finally {
       setBusy(false);
-      setTimeout(() => scrollRef.current?.scrollTo(0, 1e6), 50);
+      scrollToEnd();
     }
   };
 
+  if (!open) {
+    return (
+      <button onClick={onToggle} title="Open assistant"
+              className="fixed bottom-5 right-5 z-30 rounded-full bg-indigo-600 text-white w-14 h-14 shadow-xl hover:bg-indigo-700 text-xl">
+        💬
+      </button>
+    );
+  }
+
   return (
-    <aside className="w-96 shrink-0 border-l border-slate-200 bg-white flex flex-col h-screen sticky top-0">
-      <header className="px-4 py-3 border-b border-slate-200">
-        <h2 className="font-semibold">CampusOS Assistant</h2>
-        <p className="text-xs text-slate-400">Multi-agent · live data · {profile.name}</p>
+    <aside className="w-80 xl:w-96 shrink-0 border-l border-slate-200 bg-white flex flex-col h-screen sticky top-0">
+      <header className="px-4 py-3 border-b border-slate-200 flex items-start justify-between">
+        <div>
+          <h2 className="font-semibold">CampusOS Assistant</h2>
+          <p className="text-xs text-slate-400">Multi-agent · live data · {profile.name}</p>
+        </div>
+        <button onClick={onToggle} title="Collapse" className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

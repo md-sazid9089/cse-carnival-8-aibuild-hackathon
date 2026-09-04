@@ -1,9 +1,15 @@
+let currentProfile = { student_id: "20-40532", name: "Sakibul Hassan" };
+export function setProfile(p) {
+  currentProfile = p;
+}
+
 async function request(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const headers = {
+    "X-Student-Id": currentProfile.student_id,
+    "X-Student-Name": currentProfile.name,
+  };
+  if (body) headers["Content-Type"] = "application/json";
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
   return data;

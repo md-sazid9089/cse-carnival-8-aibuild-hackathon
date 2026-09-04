@@ -11,7 +11,7 @@ export default function Events({ profile }) {
   useSSE("events", refresh);
 
   const columns = [
-    { key: "name", label: "Event" },
+    { key: "name", label: "Event", wrap: true },
     { key: "date", label: "Date" },
     { key: "start_time", label: "Start" },
     { key: "venue", label: "Venue" },
@@ -49,7 +49,7 @@ export default function Events({ profile }) {
 
   const register = async (row) => {
     try {
-      await api.post(`/api/events/${row.id}/registrations`, profile);
+      await api.post(`/api/events/${row.id}/registrations`, {});
       toast(`Registered for "${row.name}"`, "success"); refresh();
     } catch (e) { toast(e.message, "error"); }
   };

@@ -12,20 +12,33 @@ function Card({ title, children }) {
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function Overview() {
+  const meta = useApi("/api/meta");
   const schedules = useApi("/api/schedules");
   const events = useApi("/api/events");
   const announcements = useApi("/api/announcements?include_expired=false");
   const assignments = useApi("/api/assignments");
   useSSE(null, () => { schedules.refresh(); events.refresh(); announcements.refresh(); assignments.refresh(); });
 
-  const today = DAYS[new Date().getDay()];
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  // Server-side date/time (campus timezone) so judges in other TZs see the right "today"
+  const today = meta.data?.weekday ?? DAYS[new Date().getDay()];
+  const todayIso = meta.data?.today ?? new Date().toISOString().slice(0, 10);
+  const weekAhead = new Date(new Date(todayIso).getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
   const todaysClasses = (schedules.data || []).filter((s) => s.day === today);
   const dueSoon = (assignments.data || []).filter((a) => a.deadline >= todayIso && a.deadline <= weekAhead && a.status === "pending");
   const highPriority = (announcements.data || []).filter((a) => a.priority === "high");
   const upcoming = (events.data || []).filter((e) => e.status !== "completed" && e.status !== "cancelled" && e.date >= todayIso).slice(0, 5);
+
+  if (schedules.loading || events.loading || announcements.loading || assignments.loading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <div className="grid md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 rounded-xl bg-white border border-slate-200 animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

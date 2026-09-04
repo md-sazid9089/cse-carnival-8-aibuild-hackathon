@@ -16,7 +16,7 @@ export default function DataTable({ columns, rows, onEdit, onDelete, renderExtra
           {rows.map((row) => (
             <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/60">
               {columns.map((c) => (
-                <td key={c.key} className="px-3 py-2.5 whitespace-nowrap">
+                <td key={c.key} className={`px-3 py-2.5 ${c.wrap ? "min-w-48" : "whitespace-nowrap"}`}>
                   {c.render ? c.render(row) : String(row[c.key] ?? "")}
                 </td>
               ))}

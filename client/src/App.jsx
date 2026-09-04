@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { setProfile as setApiProfile } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
 import { entities } from "./entities.jsx";
@@ -25,10 +26,12 @@ const PROFILES = [
 export default function App() {
   const [tab, setTab] = useState("overview");
   const [profile, setProfile] = useState(PROFILES[0]);
+  const [chatOpen, setChatOpen] = useState(true);
+  useEffect(() => setApiProfile(profile), [profile]);
 
   return (
     <div className="flex min-h-screen">
-      <nav className="w-56 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen">
+      <nav className="w-48 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen">
         <div className="px-4 py-5">
           <h1 className="text-white font-bold text-lg">CampusOS</h1>
           <p className="text-xs text-slate-500">AUST · AI Build Hackathon</p>
@@ -52,7 +55,12 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="flex-1 p-6 overflow-x-auto">
+      <main className="flex-1 min-w-0 p-6 overflow-x-auto">
+        <div className="flex justify-end mb-2 lg:hidden">
+          <button onClick={() => setChatOpen((o) => !o)} className="text-sm text-indigo-600 hover:underline">
+            {chatOpen ? "Hide assistant" : "Show assistant"}
+          </button>
+        </div>
         {tab === "overview" && <Overview />}
         {tab === "schedules" && <ResourcePage entity="schedules" config={entities.schedules} />}
         {tab === "rooms" && <Rooms profile={profile} />}
@@ -61,7 +69,7 @@ export default function App() {
         {tab === "assignments" && <ResourcePage entity="assignments" config={entities.assignments} />}
       </main>
 
-      <ChatPanel profile={profile} />
+      <ChatPanel profile={profile} open={chatOpen} onToggle={() => setChatOpen((o) => !o)} />
       <Toast />
     </div>
   );
