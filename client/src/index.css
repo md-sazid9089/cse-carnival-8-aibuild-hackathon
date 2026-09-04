@@ -32,6 +32,11 @@
   --accent-soft: #eef3ff;
   --accent-ink: #1e40af;
 
+  /* Constant brand slab. Defined once and deliberately not overridden in dark
+     mode — the marketing panel stays dark in both themes instead of inverting. */
+  --brand-panel: #141417;
+  --brand-panel-ink: #f5f5f7;
+
   --positive: #047857;
   --positive-soft: #ecfdf5;
   --caution: #b45309;
@@ -104,6 +109,9 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
+
+  --color-brand-panel: var(--brand-panel);
+  --color-brand-panel-ink: var(--brand-panel-ink);
 
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);

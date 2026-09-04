@@ -16,14 +16,14 @@ export default function AuthLayout({ eyebrow, title, subtitle, children, footer 
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <aside
         aria-hidden="true"
-        className="relative hidden flex-col justify-between overflow-hidden bg-ink p-12 text-ink-invert lg:flex"
+        className="relative hidden flex-col justify-between overflow-hidden bg-brand-panel p-12 text-brand-panel-ink lg:flex"
       >
         <div
           className="pointer-events-none absolute -top-32 -right-24 size-96 rounded-full opacity-[0.16] blur-3xl"
           style={{ background: "radial-gradient(circle, var(--accent), transparent 70%)" }}
         />
         <div className="relative flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-ink-invert text-[13px] font-bold text-ink">
+          <span className="grid size-8 place-items-center rounded-lg bg-brand-panel-ink text-[13px] font-bold text-brand-panel">
             C
           </span>
           <span className="text-sm font-semibold">CampusOS</span>

@@ -114,6 +114,10 @@ class Breaker:
     def ttft_budget_s(self) -> float:
         return min(max(3.0, (self.p50_ms * 3) / 1000), 15.0)
 
+    def park(self, seconds: float) -> None:
+        """Hold this model back briefly without counting it as a hard failure."""
+        self.open_until = max(self.open_until, time.monotonic() + seconds)
+
 
 class Gateway:
     def __init__(self) -> None:
@@ -198,6 +202,34 @@ class Gateway:
             k.used_today = max(k.used_today, by_hash.get(k.hash, 0))
 
     # ---- attempt planning ----
+    def _note_429(self, model: str, ks: KeyState, res: httpx.Response) -> None:
+        """Split the two very different things a 429 can mean.
+
+        A free model that is busy upstream answers with a short Retry-After and names the
+        provider; that throttles the *model* for everyone, so parking the key would burn the
+        whole pool on a five-second hiccup. Only an account-level cap parks the key.
+        """
+        retry_after = _retry_after(res)
+        detail = _error_detail(res).lower()
+        upstream = "upstream" in detail or "provider returned error" in detail
+        if upstream or (retry_after is not None and retry_after <= 60):
+            self.breakers.setdefault(model, Breaker()).park(min(max(retry_after or 5.0, 2.0), 60.0))
+            return
+        ks.note_429(retry_after)
+
+    def _park_wait_s(self, models: list[str] | None = None) -> float | None:
+        """Seconds until the soonest briefly-parked model frees up, when keys are still usable.
+
+        Free models go busy for a few seconds at a time. Waiting that out beats telling the
+        student the assistant is offline.
+        """
+        if not any(k.available() for k in self.keys):
+            return None
+        now = time.monotonic()
+        waits = [b.open_until - now for m, b in self.breakers.items()
+                 if (models is None or m in models) and b.open_until > now]
+        return min(waits) if waits else None
+
     def _attempts(self, models: list[str] | None = None) -> list[tuple[str, KeyState]]:
         """(model, key) pairs: every healthy key for the first model, then the next model."""
         plan: list[tuple[str, KeyState]] = []
@@ -236,48 +268,55 @@ class Gateway:
         """Non-streaming completion with key/model failover. Raises LLMError when every attempt fails."""
         if not self.keys:
             raise LLMError("No OpenRouter API keys configured.", "NOT_CONFIGURED", retryable=False)
-        attempts = self._attempts(models)
-        if not attempts:
-            raise LLMError("All API keys are rate-limited right now.", "RATE_LIMITED")
         last: str = "unknown error"
         client = await self.client()
-        for model, ks in attempts:
-            body = self._body(model, messages, tools, tool_choice, stream=False)
-            started = time.monotonic()
-            try:
-                async with self._sem:
-                    ks.note_request()
-                    res = await client.post("/chat/completions", json=body,
-                                            headers={"Authorization": f"Bearer {ks.key}"})
-                if res.status_code == 429:
-                    ks.note_429(_retry_after(res))
-                    last = "rate limited"
+        for _round in range(MAX_THROTTLE_ROUNDS):
+            attempts = self._attempts(models)
+            for model, ks in attempts:
+                if not self.breakers[model].closed():  # parked mid-loop: don't burn more keys on it
                     continue
-                if res.status_code in RETRYABLE_STATUS or res.status_code >= 500:
-                    self.breakers[model].record(False)
-                    last = f"HTTP {res.status_code}"
-                    await asyncio.sleep(0.5 + random.random() * 0.5)
-                    continue
-                if res.status_code >= 400:
-                    detail = _error_detail(res)
-                    if res.status_code in (401, 403):
-                        ks.exhausted_day = ks.day  # bad/blocked key: stop using it this run
-                        last = f"auth failed ({detail})"
+                body = self._body(model, messages, tools, tool_choice, stream=False)
+                started = time.monotonic()
+                try:
+                    async with self._sem:
+                        ks.note_request()
+                        res = await client.post("/chat/completions", json=body,
+                                                headers={"Authorization": f"Bearer {ks.key}"})
+                    if res.status_code == 429:
+                        self._note_429(model, ks, res)
+                        last = "rate limited"
                         continue
+                    if res.status_code in RETRYABLE_STATUS or res.status_code >= 500:
+                        self.breakers[model].record(False)
+                        last = f"HTTP {res.status_code}"
+                        await asyncio.sleep(0.5 + random.random() * 0.5)
+                        continue
+                    if res.status_code >= 400:
+                        detail = _error_detail(res)
+                        if res.status_code in (401, 403):
+                            ks.exhausted_day = ks.day  # bad/blocked key: stop using it this run
+                            last = f"auth failed ({detail})"
+                            continue
+                        self.breakers[model].record(False)
+                        last = detail
+                        continue
+                    data = res.json()
+                    choice = (data.get("choices") or [{}])[0]
+                    msg = _normalize_message(choice.get("message") or {})
+                    self.breakers[model].record(True, (time.monotonic() - started) * 1000)
+                    return {"message": msg, "finish_reason": choice.get("finish_reason"),
+                            "model": data.get("model", model), "key_index": ks.index,
+                            "usage": data.get("usage") or {}}
+                except (httpx.TimeoutException, httpx.TransportError) as exc:
                     self.breakers[model].record(False)
-                    last = detail
+                    last = f"{type(exc).__name__}"
                     continue
-                data = res.json()
-                choice = (data.get("choices") or [{}])[0]
-                msg = _normalize_message(choice.get("message") or {})
-                self.breakers[model].record(True, (time.monotonic() - started) * 1000)
-                return {"message": msg, "finish_reason": choice.get("finish_reason"),
-                        "model": data.get("model", model), "key_index": ks.index,
-                        "usage": data.get("usage") or {}}
-            except (httpx.TimeoutException, httpx.TransportError) as exc:
-                self.breakers[model].record(False)
-                last = f"{type(exc).__name__}"
-                continue
+            wait = self._park_wait_s(models)
+            if wait is None or wait > MAX_THROTTLE_WAIT_S:
+                break
+            await asyncio.sleep(wait + 0.2)
+        if not any(k.available() for k in self.keys):
+            raise LLMError("All API keys are rate-limited right now.", "RATE_LIMITED")
         raise LLMError(f"All providers failed ({last}).", "LLM_UNAVAILABLE")
 
     async def stream(self, messages: list[dict], tools: list[dict] | None = None,
@@ -293,6 +332,8 @@ class Gateway:
         last = "unknown error"
         client = await self.client()
         for model, ks in attempts:
+            if not self.breakers[model].closed():  # parked mid-loop: don't burn more keys on it
+                continue
             body = self._body(model, messages, tools, tool_choice, stream=True)
             started = time.monotonic()
             emitted = False
@@ -303,7 +344,7 @@ class Gateway:
                                              headers={"Authorization": f"Bearer {ks.key}"}) as res:
                         if res.status_code == 429:
                             await res.aread()
-                            ks.note_429(_retry_after(res))
+                            self._note_429(model, ks, res)
                             last = "rate limited"
                             continue
                         if res.status_code >= 400:

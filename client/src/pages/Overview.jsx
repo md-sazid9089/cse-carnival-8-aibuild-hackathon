@@ -51,9 +51,10 @@ function StatTile({ icon: Icon, label, value, onClick }) {
       </span>
       <span className="min-w-0">
         <span className="block text-lg leading-none font-semibold text-ink tabular">{value}</span>
-        <span className="mt-1 block truncate text-[12px] text-ink-3">{label}</span>
+        {/* Wraps rather than truncates — a stat you can't read the label of is noise. */}
+        <span className="mt-1 block text-[12px] leading-snug text-balance text-ink-3">{label}</span>
       </span>
-      <ArrowRight size={15} className="ml-auto text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
+      <ArrowRight size={15} className="ml-auto shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
     </button>
   );
 }

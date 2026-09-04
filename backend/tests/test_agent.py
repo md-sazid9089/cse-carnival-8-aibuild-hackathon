@@ -38,7 +38,7 @@ def run(coro):
 
 # ---------------------------------------------------------------- fake provider
 class FakeRouter:
-    """Scripted OpenRouter. Each entry: (status, payload) or an Exception to raise."""
+    """Scripted OpenRouter. Each entry: (status, payload[, headers]) or an Exception to raise."""
 
     def __init__(self, script):
         self.script = list(script)
@@ -51,7 +51,7 @@ class FakeRouter:
         item = self.script.pop(0) if self.script else (200, _msg("fallback answer"))
         if isinstance(item, Exception):
             raise item
-        status, payload = item
+        status, payload, headers = item if len(item) == 3 else (*item, {})
         if body.get("stream") and status == 200:
             lines = []
             msg = payload["choices"][0]["message"]
@@ -73,8 +73,8 @@ class FakeRouter:
                 {"choices": [{"delta": {}, "finish_reason": payload["choices"][0]["finish_reason"]}]}))
             lines.append("data: [DONE]")
             return httpx.Response(200, text="\n".join(lines) + "\n",
-                                  headers={"content-type": "text/event-stream"})
-        return httpx.Response(status, json=payload)
+                                  headers={"content-type": "text/event-stream", **headers})
+        return httpx.Response(status, json=payload, headers=headers)
 
 
 def _msg(content=None, tool_calls=None, finish=None):
@@ -121,6 +121,44 @@ try:
     check("gateway: exhausted pool raises LLMError", False, "no raise")
 except LLMError as exc:
     check("gateway: exhausted pool raises LLMError", exc.reason in ("LLM_UNAVAILABLE", "RATE_LIMITED"), exc.reason)
+
+# A busy free model answers 429 + short Retry-After. That throttles the model for everyone, so it
+# must park the MODEL and leave every key usable - otherwise one 5 s hiccup kills the whole pool.
+UPSTREAM_429 = (429, {"error": {"message": "Provider returned error", "code": 429,
+                                "metadata": {"raw": "z-ai/glm-5.2:free is temporarily rate-limited upstream"}}},
+                {"retry-after": "5"})
+gw, fake = make_gateway([UPSTREAM_429, (200, _msg("second model"))])
+out = run(gw.complete([{"role": "user", "content": "x"}]))
+check("gateway: upstream 429 falls through to the next model",
+      out["message"]["content"] == "second model" and fake.calls[1][1] == "model-b", fake.calls)
+check("gateway: upstream 429 leaves every key usable",
+      all(k.available() for k in gw.keys), [k.limit_status() for k in gw.keys])
+check("gateway: upstream 429 parks only the throttled model",
+      not gw.breakers["model-a"].closed() and gw.breakers["model-b"].closed(),
+      {m: b.closed() for m, b in gw.breakers.items()})
+
+# ...and it must not burn the other keys on the model that just said "I'm busy".
+gw, fake = make_gateway([UPSTREAM_429, (200, _msg("next"))])
+run(gw.complete([{"role": "user", "content": "x"}]))
+check("gateway: parked model is not retried with the remaining keys",
+      sum(1 for c in fake.calls if c[1] == "model-a") == 1, fake.calls)
+
+# The pool must still work on the next turn (the bug: turn 2 fell into degraded mode).
+gw, fake = make_gateway([UPSTREAM_429, (200, _msg("turn one"))])
+run(gw.complete([{"role": "user", "content": "x"}]))
+gw.breakers["model-a"].open_until = 0.0  # simulate the short park expiring
+out = run(gw.complete([{"role": "user", "content": "y"}]))
+check("gateway: pool recovers on the next turn after an upstream throttle",
+      out["message"]["content"] == "fallback answer" and fake.calls[-1][1] == "model-a",
+      fake.calls)
+
+# An account-level cap has no short Retry-After: that one really does park the key.
+gw, fake = make_gateway([(429, {"error": {"message": "Rate limit exceeded: free-models-per-day"}}),
+                         (200, _msg("other key"))])
+out = run(gw.complete([{"role": "user", "content": "x"}]))
+check("gateway: daily cap 429 parks the key and cycles",
+      out["message"]["content"] == "other key" and not gw.keys[0].available(),
+      [k.limit_status() for k in gw.keys])
 
 gw, fake = make_gateway([(401, {"error": {"message": "bad key"}}), (200, _msg("ok"))])
 out = run(gw.complete([{"role": "user", "content": "x"}]))

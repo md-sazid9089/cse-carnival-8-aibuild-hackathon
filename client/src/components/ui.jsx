@@ -184,7 +184,7 @@ export function Field({ label, hint, error, required = false, htmlFor, className
             <span className="sr-only"> (required)</span>
           </>
         ) : (
-          <span className="ml-1 text-ink-3">(optional)</span>
+          <span className="ml-1 font-normal text-ink-3">{" (optional)"}</span>
         )}
       </label>
       {typeof children === "function" ? children({ describedBy: error || hint ? messageId : undefined }) : children}
