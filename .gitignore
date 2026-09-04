@@ -7,8 +7,7 @@ venv/
 env/
 
 # Environment
-.env
-backend/.env
+
 *.env.local
 .ecc/
 
