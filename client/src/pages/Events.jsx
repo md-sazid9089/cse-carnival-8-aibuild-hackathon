@@ -5,10 +5,13 @@ import RecordModal from "../components/RecordModal.jsx";
 import { badge, eventFields } from "../entities.jsx";
 import { useApi, useSSE } from "../hooks.js";
 
-export default function Events({ profile }) {
+export default function Events({ user, profile }) {
   const { data, loading, refresh } = useApi("/api/events");
   const [modal, setModal] = useState(null);
   useSSE("events", refresh);
+
+  const activeUser = user || profile;
+  const isAuthority = activeUser?.role_id === "authority" || activeUser?.role === "authority";
 
   const columns = [
     { key: "name", label: "Event", wrap: true },
@@ -45,7 +48,7 @@ export default function Events({ profile }) {
     catch (e) { toast(e.message, "error"); }
   };
 
-  const isRegistered = (row) => row.registrations?.some((r) => r.student_id === profile.student_id);
+  const isRegistered = (row) => row.registrations?.some((r) => r.student_id === activeUser?.student_id);
 
   const register = async (row) => {
     try {
@@ -56,7 +59,7 @@ export default function Events({ profile }) {
 
   const unregister = async (row) => {
     try {
-      await api.del(`/api/events/${row.id}/registrations/${profile.student_id}`);
+      await api.del(`/api/events/${row.id}/registrations/${activeUser?.student_id}`);
       toast("Registration cancelled", "success"); refresh();
     } catch (e) { toast(e.message, "error"); }
   };
@@ -64,7 +67,14 @@ export default function Events({ profile }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Events</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Events</h1>
+          {isAuthority && (
+            <span className="text-xs bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full font-medium">
+               Authority Access
+            </span>
+          )}
+        </div>
         <button onClick={() => setModal({ mode: "create" })}
                 className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">+ Add Event</button>
       </div>
@@ -88,3 +98,4 @@ export default function Events({ profile }) {
     </div>
   );
 }
+

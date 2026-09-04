@@ -66,15 +66,17 @@ def seed_rbac() -> bool:
         "authority": [p[0] for p in permissions],  # All permissions
     }
 
+    from .services.auth import hash_password
+
     users = [
-        # (id, role_id, student_id, employee_id, name, email, department, status)
-        ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active"),
-        ("usr-002", "student", "99-00001", None, "QA Tester", "qa.tester@aust.edu", "CSE", "active"),
-        ("usr-003", "student", "20-40533", None, "Tanvir Ahmed", "tanvir.ahmed@aust.edu", "CSE", "active"),
-        ("usr-004", "teacher", None, "FAC-0101", "Prof. Dr. Md. Shahriar Mahbub", "shahriar.mahbub@aust.edu", "CSE", "active"),
-        ("usr-005", "teacher", None, "FAC-0102", "Prof. Dr. Md. Shamim Akhter", "shamim.akhter@aust.edu", "CSE", "active"),
-        ("usr-006", "authority", None, "AUTH-0001", "AUST Administration", "admin@aust.edu", "CSE", "active"),
-        ("usr-007", "authority", None, "AUTH-0002", "Head of Department", "head.cse@aust.edu", "CSE", "active"),
+        # (id, role_id, student_id, employee_id, name, email, department, status, password)
+        ("usr-001", "student", "20-40532", None, "Sakibul Hassan", "sakibul.hassan@aust.edu", "CSE", "active", "student123"),
+        ("usr-002", "student", "99-00001", None, "QA Tester", "qa.tester@aust.edu", "CSE", "active", "student123"),
+        ("usr-003", "student", "20-40533", None, "Tanvir Ahmed", "tanvir.ahmed@aust.edu", "CSE", "active", "student123"),
+        ("usr-004", "teacher", None, "FAC-0101", "Prof. Dr. Md. Shahriar Mahbub", "shahriar.mahbub@aust.edu", "CSE", "active", "teacher123"),
+        ("usr-005", "teacher", None, "FAC-0102", "Prof. Dr. Md. Shamim Akhter", "shamim.akhter@aust.edu", "CSE", "active", "teacher123"),
+        ("usr-006", "authority", None, "AUTH-0001", "AUST Administration", "admin@aust.edu", "CSE", "active", "admin@aust2026"),
+        ("usr-007", "authority", None, "AUTH-0002", "Head of Department", "head.cse@aust.edu", "CSE", "active", "admin@aust2026"),
     ]
 
     with pool.connection() as conn:
@@ -103,10 +105,11 @@ def seed_rbac() -> bool:
                     [role_id, perm_id],
                 )
 
-        for u_id, role_id, student_id, employee_id, name, email, dept, status in users:
+        for u_id, role_id, student_id, employee_id, name, email, dept, status, plain_pw in users:
+            pw_hash = hash_password(plain_pw)
             conn.execute(
-                """INSERT INTO users (id, role_id, student_id, employee_id, name, email, department, status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """INSERT INTO users (id, role_id, student_id, employee_id, name, email, department, status, password_hash)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (id) DO UPDATE SET
                        name = EXCLUDED.name,
                        email = EXCLUDED.email,
@@ -114,8 +117,9 @@ def seed_rbac() -> bool:
                        student_id = EXCLUDED.student_id,
                        employee_id = EXCLUDED.employee_id,
                        department = EXCLUDED.department,
-                       status = EXCLUDED.status""",
-                [u_id, role_id, student_id, employee_id, name, email, dept, status],
+                       status = EXCLUDED.status,
+                       password_hash = EXCLUDED.password_hash""",
+                [u_id, role_id, student_id, employee_id, name, email, dept, status, pw_hash],
             )
     return True
 
