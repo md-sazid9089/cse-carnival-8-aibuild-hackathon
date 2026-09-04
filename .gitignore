@@ -9,7 +9,9 @@ env/
 # Environment
 .env
 backend/.env
+client/.env
 *.env.local
+.ecc/
 
 # Build outputs
 dist/

@@ -1,10 +1,12 @@
 """Authentication service: password hashing (PBKDF2-HMAC-SHA256), sign up, and sign in."""
 import base64
 import hashlib
+import hmac
 import json
 import secrets
 import time
 
+from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S
 from ..db import execute, next_id, q, q1
 from .common import DomainError
 
@@ -33,32 +35,39 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
         return False
 
 
+def _sign(raw: bytes) -> str:
+    return hmac.new(AUTH_SECRET, raw, hashlib.sha256).hexdigest()
+
+
 def create_token(user: dict) -> str:
-    """Generate a lightweight bearer session token containing payload and signature."""
+    """Generate a signed, expiring bearer session token."""
+    now = int(time.time())
     payload = {
         "uid": user["id"],
         "email": user["email"],
         "role": user["role_id"],
         "name": user["name"],
         "student_id": user.get("student_id"),
-        "ts": int(time.time()),
+        "ts": now,
+        "exp": now + AUTH_TOKEN_TTL_S,
     }
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    sig = hashlib.sha256(raw + b":campusos-secret-salt").hexdigest()[:16]
-    return f"{base64.urlsafe_b64encode(raw).decode('utf-8')}.{sig}"
+    return f"{base64.urlsafe_b64encode(raw).decode('utf-8')}.{_sign(raw)}"
 
 
 def parse_token(token: str) -> dict | None:
-    """Verify and parse a bearer session token."""
+    """Verify and parse a bearer session token. Returns None for forged or expired tokens."""
     try:
         parts = token.split(".")
         if len(parts) != 2:
             return None
         raw = base64.urlsafe_b64decode(parts[0].encode("utf-8"))
-        expected_sig = hashlib.sha256(raw + b":campusos-secret-salt").hexdigest()[:16]
-        if not secrets.compare_digest(parts[1], expected_sig):
+        if not hmac.compare_digest(parts[1], _sign(raw)):
             return None
-        return json.loads(raw.decode("utf-8"))
+        claims = json.loads(raw.decode("utf-8"))
+        if int(claims.get("exp", 0)) < int(time.time()):
+            return None
+        return claims
     except Exception:
         return None
 

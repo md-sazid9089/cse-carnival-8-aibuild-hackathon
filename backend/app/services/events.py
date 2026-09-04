@@ -1,9 +1,11 @@
+import re
+
 from psycopg.rows import dict_row
 
 from .. import sse
 from ..db import execute, next_id, pool, q, q1, ser_row
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, check_time, check_time_order, require, to_int
+from .common import DomainError, check_date, check_enum, check_time, check_time_order, require, to_int, today_local
 
 FIELDS = ["name", "description", "date", "start_time", "end_time", "end_date", "venue", "organizer", "capacity", "status"]
 STATUSES = ["upcoming", "ongoing", "completed", "cancelled", "full"]
@@ -67,8 +69,14 @@ def create_event(data: dict) -> dict:
 
 
 def update_event(eid: str, data: dict) -> dict:
-    merged = {**get_event(eid), **{k: v for k, v in data.items() if k in FIELDS}}
+    current = get_event(eid)
+    merged = {**current, **{k: v for k, v in data.items() if k in FIELDS}}
     _validate(merged)
+    if to_int(merged["capacity"], "capacity", minimum=1) < current["registered"]:
+        raise DomainError("CAPACITY_BELOW_REGISTERED",
+                          f"Capacity cannot be below the {current['registered']} students already registered", 409)
+    if merged["end_date"] < merged["date"]:
+        raise DomainError("INVALID_DATE_RANGE", "end_date must not be before date")
     execute(
         """UPDATE events SET name=%s,description=%s,date=%s,start_time=%s,end_time=%s,end_date=%s,
            venue=%s,organizer=%s,capacity=%s,status=%s WHERE id=%s""",
@@ -89,13 +97,16 @@ def delete_event(eid: str) -> None:
 
 def register(eid: str, student_id: str, name: str) -> dict:
     """Transactional with row lock: capacity can never be exceeded."""
+    today = today_local()
     with pool.connection() as conn:
         conn.row_factory = dict_row
         ev = conn.execute("SELECT * FROM events WHERE id = %s FOR UPDATE", [eid]).fetchone()
         if not ev:
             raise DomainError("NOT_FOUND", f"Event {eid} not found", 404)
         if ev["status"] in ("cancelled", "completed"):
-            raise DomainError("EVENT_CLOSED", f"\"{ev['name']}\" is {ev['status']} — registration not possible", 409)
+            raise DomainError("EVENT_CLOSED", f"\"{ev['name']}\" is {ev['status']} \u2014 registration not possible", 409)
+        if ev["end_date"] < today:
+            raise DomainError("EVENT_CLOSED", f"\"{ev['name']}\" already finished on {ev['end_date']}", 409)
         if ev["status"] == "full" or ev["registered"] >= ev["capacity"]:
             raise DomainError("EVENT_FULL", f"\"{ev['name']}\" is full ({ev['registered']}/{ev['capacity']})", 409)
         dup = conn.execute("SELECT 1 FROM registrations WHERE event_id = %s AND student_id = %s",
@@ -126,3 +137,37 @@ def cancel_registration(eid: str, student_id: str) -> dict:
         conn.execute("UPDATE events SET registered = %s, status = %s WHERE id = %s", [new_count, new_status, eid])
     sse.publish("events", "update", eid)
     return get_event(eid)
+
+
+def resolve_event(ref: str) -> dict:
+    """Accept an event id or a (fuzzy) name. Ambiguity is reported, never guessed."""
+    ref = str(ref or "").strip()
+    if not ref:
+        raise DomainError("MISSING_FIELDS", "Give an event id or name")
+    row = q1("SELECT id FROM events WHERE id = %s", [ref])
+    if row:
+        return get_event(row["id"])
+    matches = q("SELECT id, name, date FROM events WHERE lower(name) = lower(%s)", [ref])
+    if not matches:
+        matches = q("SELECT id, name, date FROM events WHERE name ILIKE %s ORDER BY date", [f"%{ref}%"])
+    if not matches:
+        words = [w for w in re.split(r"\W+", ref) if len(w) > 3]
+        if words:
+            clauses = " OR ".join("name ILIKE %s" for _ in words)
+            matches = q(f"SELECT id, name, date FROM events WHERE {clauses} ORDER BY date",
+                        [f"%{w}%" for w in words])
+    if not matches:
+        raise DomainError("NOT_FOUND", f"No event matches {ref!r}", 404)
+    if len(matches) == 1:
+        return get_event(matches[0]["id"])
+    options = ", ".join(f"{e['id']} \u2014 {e['name']}" for e in matches[:5])
+    raise DomainError("AMBIGUOUS", f"Several events match {ref!r}: {options}. Ask the user which one.", 409)
+
+
+def list_my_registrations(student_id: str) -> list[dict]:
+    return q(
+        """SELECT e.id, e.name, e.date, e.start_time, e.end_time, e.venue, e.status
+           FROM registrations r JOIN events e ON e.id = r.event_id
+           WHERE r.student_id = %s ORDER BY e.date, e.start_time""",
+        [student_id],
+    )

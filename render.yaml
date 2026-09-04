@@ -11,14 +11,14 @@ services:
         value: 3.12.8
       - key: DATABASE_URL
         sync: false # paste your Postgres URL (Neon free tier works; needs pgvector)
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: OPENROUTER_MODEL
-        value: z-ai/glm-5.2:free
-      - key: OPENROUTER_ROUTER_MODEL
-        value: nvidia/nemotron-3.5-lightning:free
+      - key: OPENROUTER_API_KEYS
+        sync: false # one or more OpenRouter keys, comma-separated
+      - key: OPENROUTER_MODELS
+        value: z-ai/glm-5.2:free,minimax/minimax-m3:free,nvidia/nemotron-3.5-lightning:free
       - key: ALLOWED_ORIGINS
         sync: false # your Vercel URL, e.g. https://campusos.vercel.app
+      - key: AUTH_SECRET
+        generateValue: true # signs sign-in session tokens
       - key: EMBEDDINGS_ENABLED
         value: "1" # set to "0" if the instance runs out of memory
       - key: TZ_NAME

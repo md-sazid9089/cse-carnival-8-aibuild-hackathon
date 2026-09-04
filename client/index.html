@@ -2,6 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="CampusOS — your class schedule, rooms, events, notices and deadlines in one place, with an AI assistant that reads live campus data." />
+    <meta name="theme-color" content="#f6f6f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="CampusOS — your entire campus, one intelligent system. Schedules, rooms, events, announcements and assignments with an AI agent that gets things done." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,6 +15,25 @@
       rel="stylesheet"
     />
     <title>CampusOS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
+    <script>
+      // Resolve the theme before first paint so there is no flash of the wrong mode.
+      (function () {
+        try {
+          var saved = localStorage.getItem("campusos-theme");
+          var mode = saved === "light" || saved === "dark" ? saved
+            : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = mode;
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

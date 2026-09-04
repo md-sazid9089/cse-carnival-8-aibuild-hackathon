@@ -1,3 +1,6 @@
+// Deployed frontend (e.g. Vercel) points at the hosted backend; empty = same-origin/Vite proxy
+export const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+
 const STORAGE_USER_KEY = "campusos_user";
 const STORAGE_TOKEN_KEY = "campusos_token";
 
@@ -28,9 +31,9 @@ const DEFAULT_USER = {
 function loadStoredUser() {
   try {
     const raw = localStorage.getItem(STORAGE_USER_KEY);
-    return raw ? JSON.parse(raw) : DEFAULT_USER;
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return DEFAULT_USER;
+    return null;
   }
 }
 
@@ -42,12 +45,13 @@ function loadStoredToken() {
   }
 }
 
-let currentUser = loadStoredUser();
 let currentToken = loadStoredToken();
+// A stored user only counts while a token backs it — there is no anonymous identity.
+let currentUser = currentToken ? loadStoredUser() : null;
 let currentProfile = {
-  student_id: currentUser?.student_id || DEFAULT_USER.student_id,
-  name: currentUser?.name || DEFAULT_USER.name,
-  role: currentUser?.role_id || DEFAULT_USER.role_id,
+  student_id: currentUser?.student_id || "",
+  name: currentUser?.name || "",
+  role: currentUser?.role_id || "",
 };
 
 export function getStoredUser() {
@@ -82,32 +86,55 @@ export function setAuth(user, token) {
 }
 
 export function clearAuth() {
-  setAuth(DEFAULT_USER, "");
+  setAuth(null, "");
 }
 
-async function request(method, path, body) {
+/** Identity headers for every call: a signed token when present, plus the acting profile. */
+export function authHeaders() {
   const headers = {};
-  if (currentToken) {
-    headers["Authorization"] = `Bearer ${currentToken}`;
-  }
-  if (currentProfile.student_id) {
-    headers["X-Student-Id"] = currentProfile.student_id;
-  }
-  if (currentProfile.name) {
-    headers["X-Student-Name"] = currentProfile.name;
-  }
-  if (currentUser?.role_id || currentProfile.role) {
-    headers["X-Role"] = currentUser?.role_id || currentProfile.role || "student";
-  }
+  if (currentToken) headers["Authorization"] = `Bearer ${currentToken}`;
+  if (currentProfile.student_id) headers["X-Student-Id"] = currentProfile.student_id;
+  if (currentProfile.name) headers["X-Student-Name"] = currentProfile.name;
+  return headers;
+}
+
+/** FastAPI 422 bodies carry an array of validation objects; 5xx bodies can carry
+ *  internal detail. Turn both into one sentence a user can act on. */
+function readError(status, data) {
+  if (Array.isArray(data?.detail)) return data.detail.map((d) => d?.msg ?? "Invalid value").join(", ");
+  if (typeof data?.detail === "string") return data.detail;
+  if (typeof data?.error === "string" && status < 500) return data.error;
+  if (status >= 500) return "The campus server had a problem. Please try again.";
+  return `Request failed (${status})`;
+}
+
+const TIMEOUT_MS = 20000;
+
+async function request(method, path, body) {
+  const headers = authHeaders();
   if (body) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(path, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  // Without a deadline a stalled connection leaves dialogs stuck in "Saving…".
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("The campus server did not respond in time.");
+    throw new Error("Could not reach the campus server. Check that the backend is running.");
+  } finally {
+    clearTimeout(timer);
+  }
+
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error(readError(res.status, data));
   return data;
 }
 

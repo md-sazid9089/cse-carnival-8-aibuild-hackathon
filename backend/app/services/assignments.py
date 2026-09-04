@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from .. import sse
 from ..db import execute, next_id, q, q1
 from ..search.indexer import reindex, unindex
-from .common import DomainError, check_date, check_enum, require, to_int
+from .common import DomainError, check_date, check_enum, require, today_local, to_int
+from .courses import ensure_course
 
 FIELDS = ["course", "course_title", "title", "description", "assigned_date", "deadline",
           "submission_platform", "status", "marks"]
@@ -13,7 +16,9 @@ def list_assignments(status: str | None = None, due_within_days: int | None = No
     if status:
         conds.append("status = %s"); params.append(status)
     if due_within_days is not None:
-        conds.append("deadline BETWEEN CURRENT_DATE AND CURRENT_DATE + %s::int"); params.append(int(due_within_days))
+        today = today_local()
+        conds.append("deadline BETWEEN %s AND %s")
+        params.extend([today, today + timedelta(days=int(due_within_days))])
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY deadline", params)
@@ -39,6 +44,7 @@ def create_assignment(data: dict) -> dict:
     data.setdefault("status", "pending")
     require(data, FIELDS)
     _validate(data)
+    ensure_course(data["course"], data["course_title"])
     aid = next_id("assignments", "asgn")
     execute("INSERT INTO assignments VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             [aid] + [data[f] for f in FIELDS])
@@ -51,6 +57,7 @@ def create_assignment(data: dict) -> dict:
 def update_assignment(aid: str, data: dict) -> dict:
     merged = {**get_assignment(aid), **{k: v for k, v in data.items() if k in FIELDS}}
     _validate(merged)
+    ensure_course(merged["course"], merged["course_title"])
     execute(
         """UPDATE assignments SET course=%s,course_title=%s,title=%s,description=%s,assigned_date=%s,
            deadline=%s,submission_platform=%s,status=%s,marks=%s WHERE id=%s""",

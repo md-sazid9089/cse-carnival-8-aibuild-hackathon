@@ -1,17 +1,20 @@
 from .. import sse
 from ..db import execute, next_id, q, q1
 from .common import DAYS, DomainError, check_enum, check_time, check_time_order, require
+from .courses import ensure_course
 
 FIELDS = ["course", "title", "day", "start_time", "end_time", "room", "instructor", "section"]
 
 
-def list_schedules(day: str | None = None, course: str | None = None) -> list[dict]:
+def list_schedules(day: str | None = None, course: str | None = None, instructor: str | None = None) -> list[dict]:
     sql, params = "SELECT * FROM schedules", []
     conds = []
     if day:
         conds.append("day = %s"); params.append(day)
     if course:
         conds.append("course ILIKE %s"); params.append(f"%{course}%")
+    if instructor:
+        conds.append("instructor ILIKE %s"); params.append(f"%{instructor}%")
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY array_position(%s::text[], day), start_time", params + [DAYS])
@@ -34,6 +37,7 @@ def _validate(data: dict) -> None:
 def create_schedule(data: dict) -> dict:
     require(data, FIELDS)
     _validate(data)
+    ensure_course(data["course"], data["title"])
     sid = next_id("schedules", "sch")
     execute(
         "INSERT INTO schedules VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -46,6 +50,7 @@ def create_schedule(data: dict) -> dict:
 def update_schedule(sid: str, data: dict) -> dict:
     merged = {**get_schedule(sid), **{k: v for k, v in data.items() if k in FIELDS}}
     _validate(merged)
+    ensure_course(merged["course"], merged["title"])
     execute(
         "UPDATE schedules SET course=%s,title=%s,day=%s,start_time=%s,end_time=%s,room=%s,instructor=%s,section=%s WHERE id=%s",
         [merged[f] for f in FIELDS] + [sid],

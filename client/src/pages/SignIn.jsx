@@ -173,16 +173,6 @@ export default function SignIn({ onNavigate, onSuccess }) {
               ))}
             </div>
           </div>
-
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => onNavigate && onNavigate("overview")}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              ← Continue to Guest Dashboard
-            </button>
-          </div>
         </div>
       </div>
     </div>

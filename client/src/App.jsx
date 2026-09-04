@@ -1,26 +1,116 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import ChatPanel, { AssistantFab } from "./components/ChatPanel.jsx";
+import CommandPalette from "./components/CommandPalette.jsx";
+import ConfirmHost from "./components/ConfirmDialog.jsx";
 import { useEffect, useState } from "react";
 import { FiBell, FiCalendar, FiFileText, FiFlag, FiGrid, FiHome } from "react-icons/fi";
 import { clearAuth, getStoredToken, getStoredUser, setAuth, setProfile as setApiProfile, toast } from "./api.js";
 import ChatPanel from "./components/ChatPanel.jsx";
 import Toast from "./components/Toast.jsx";
+import { Button, IconButton, Kbd } from "./components/ui.jsx";
+import { useMediaQuery, useTheme } from "./hooks.js";
+import { CampusProvider, useCampus } from "./lib/campus.jsx";
+import { useFocusTrap } from "./lib/focus.js";
+import { cx, initials } from "./lib/format.js";
+import { Calendar, Chat, Clipboard, Door, Megaphone, Menu, Moon, Search, Sun, Ticket, Today, X } from "./lib/icons.jsx";
+import Announcements from "./pages/Announcements.jsx";
+import Assignments from "./pages/Assignments.jsx";
 import { entities } from "./entities.jsx";
 import LandingPage from "./landing/LandingPage.tsx";
 import Events from "./pages/Events.jsx";
 import Overview from "./pages/Overview.jsx";
-import ResourcePage from "./pages/ResourcePage.jsx";
 import Rooms from "./pages/Rooms.jsx";
+import Schedules from "./pages/Schedules.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
 
 const NAV = [
-  { id: "overview", label: "Overview", icon: FiHome },
-  { id: "schedules", label: "Schedules", icon: FiCalendar },
-  { id: "rooms", label: "Rooms", icon: FiGrid },
-  { id: "events", label: "Events", icon: FiFlag },
-  { id: "announcements", label: "Announcements", icon: FiBell },
-  { id: "assignments", label: "Assignments", icon: FiFileText },
+  { id: "overview", label: "Today", icon: Today },
+  { id: "schedules", label: "Schedules", icon: Calendar },
+  { id: "rooms", label: "Rooms", icon: Door },
+  { id: "events", label: "Events", icon: Ticket },
+  { id: "announcements", label: "Announcements", icon: Megaphone },
+  { id: "assignments", label: "Assignments", icon: Clipboard },
 ];
 
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "");
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink text-[13px] font-bold text-ink-invert">
+        C
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm leading-tight font-semibold text-ink">CampusOS</span>
+        <span className="block text-[11px] leading-tight text-ink-3">AUST · live campus data</span>
+      </span>
+    </div>
+  );
+}
+
+function NavList({ tab, onSelect }) {
+  return (
+    <nav aria-label="Sections" className="flex flex-col gap-0.5">
+      {NAV.map((item) => {
+        const Icon = item.icon;
+        const active = tab === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item.id)}
+            aria-current={active ? "page" : undefined}
+            className={cx(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-150",
+              active ? "bg-surface-3 font-medium text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+            )}
+          >
+            <Icon size={17} className={active ? "text-ink" : "text-ink-3"} />
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function AccountCard() {
+  const { profile, account, signOut } = useCampus();
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 p-2.5">
+      <div className="mb-2 flex items-center gap-2.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-ink">
+          {initials(profile.name)}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-medium text-ink">{profile.name}</span>
+          <span className="block truncate text-[11px] text-ink-3 tabular">
+            {account?.student_id || account?.employee_id || account?.role_id}
+          </span>
+        </span>
+      </div>
+      <Button size="sm" variant="ghost" className="w-full" onClick={signOut}>
+        Sign out
+      </Button>
+    </div>
+  );
+}
+
+function Shell() {
+  const [tab, setTab] = useState("overview");
+  const [navQuery, setNavQuery] = useState("");
+  const [navKey, setNavKey] = useState(0);
+  const [drawer, setDrawer] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const isWide = useMediaQuery("(min-width: 1280px)");
+  const [chatOpen, setChatOpen] = useState(isWide);
+  const { theme, toggle } = useTheme();
+  const drawerRef = useRef(null);
+
+  useFocusTrap({ active: drawer, containerRef: drawerRef, onClose: () => setDrawer(false) });
+
+  // Auto-close when the dock no longer fits; never re-open a panel the user closed.
 function getRouteFromPath(pathname) {
   const decoded = decodeURIComponent(pathname || "").toLowerCase().trim();
   if (decoded === "/" || decoded === "") return "landing";
@@ -65,27 +155,38 @@ export default function App() {
   };
 
   useEffect(() => {
-    setApiProfile(profile);
-  }, [user]);
+    if (!isWide) setChatOpen(false);
+  }, [isWide]);
 
-  // Synchronize history navigation and URL changes
-  useEffect(() => {
-    const onLocationChange = () => {
-      setTab(getRouteFromPath(window.location.pathname));
-    };
-    window.addEventListener("popstate", onLocationChange);
-
-    const onAuthChange = (e) => {
-      setUser(e.detail?.user || getStoredUser());
-    };
-    window.addEventListener("campusos:auth_change", onAuthChange);
-
-    return () => {
-      window.removeEventListener("popstate", onLocationChange);
-      window.removeEventListener("campusos:auth_change", onAuthChange);
-    };
+  const navigate = useCallback((next, query = "") => {
+    setTab(next);
+    setNavQuery(query);
+    setNavKey((value) => value + 1);
+    setDrawer(false);
   }, []);
 
+  useEffect(() => {
+    const onKey = (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      // Don't hijack the shortcut away from a dialog or a field being typed in.
+      const target = event.target;
+      if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? "")) return;
+      if (document.querySelector('[role="dialog"]:not([aria-label="Search CampusOS"])')) return;
+      event.preventDefault();
+      setPalette((open) => !open);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const pages = {
+    overview: <Overview onNavigate={navigate} />,
+    schedules: <Schedules initialQuery={navQuery} />,
+    rooms: <Rooms initialQuery={navQuery} />,
+    events: <Events initialQuery={navQuery} />,
+    announcements: <Announcements initialQuery={navQuery} />,
+    assignments: <Assignments initialQuery={navQuery} />,
+  };
   const navigateTo = (newTab, updateHistory = true) => {
     setTab(newTab);
     if (updateHistory) {
@@ -138,16 +239,34 @@ export default function App() {
   const hasToken = !!getStoredToken();
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      {/* Sidebar Navigation */}
-      <nav className="w-56 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen border-r border-slate-800">
-        <div className="px-4 py-5 border-b border-slate-800">
-          <div className="flex items-center justify-between">
-            <h1 className="text-white font-bold text-lg tracking-tight">CampusOS</h1>
-            <span className="text-[10px] bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.5 rounded font-mono">v1.0</span>
-          </div>
-          <p className="text-xs text-slate-400 mt-0.5">AUST · AI University Platform</p>
+    <div className="flex min-h-screen bg-canvas">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-80 focus:rounded-lg focus:bg-ink focus:px-3 focus:py-2 focus:text-[13px] focus:text-ink-invert"
+      >
+        Skip to content
+      </a>
+
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 lg:flex">
+        <div className="px-1.5 pb-4">
+          <Brand />
         </div>
+        <NavList tab={tab} onSelect={navigate} />
+        <div className="mt-auto flex flex-col gap-2 pt-4">
+          <button
+            type="button"
+            onClick={() => setPalette(true)}
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-2 text-[13px] text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
+          >
+            <Search size={15} />
+            Search
+            <span className="ml-auto flex gap-1">
+              <Kbd>{IS_MAC ? "⌘" : "Ctrl"}</Kbd>
+              <Kbd>K</Kbd>
+            </span>
+          </button>
+          <AccountCard />
 
         <div className="py-2 flex-1 overflow-y-auto">
           {NAV.map((n) => (
@@ -164,133 +283,93 @@ export default function App() {
             </button>
           ))}
         </div>
+      </aside>
 
-        {/* User Account / Profile Footer */}
-        <div className="p-3 bg-slate-950/80 border-t border-slate-800 text-xs">
-          <div className="flex items-start justify-between mb-2">
-            <div className="min-w-0 pr-1">
-              <div className="font-semibold text-white truncate text-xs">{user?.name || "Sakibul Hassan"}</div>
-              <div className="text-[11px] text-slate-400 truncate">
-                {user?.student_id ? `ID: ${user.student_id}` : user?.email || "Student Profile"}
-              </div>
+      {/* Mobile drawer */}
+      {drawer ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-overlay animate-fade-in" onClick={() => setDrawer(false)} aria-hidden="true" />
+          <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+            className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-line bg-surface px-3 py-4 shadow-lg animate-sheet"
+          >
+            <div className="flex items-center justify-between px-1.5 pb-4">
+              <Brand />
+              <IconButton icon={X} label="Close menu" onClick={() => setDrawer(false)} />
             </div>
-            <span
-              className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                isAuthority
-                  ? "bg-purple-950/90 text-purple-300 border-purple-600 shadow-sm shadow-purple-900/40"
-                  : user?.role_id === "teacher"
-                  ? "bg-emerald-950/90 text-emerald-300 border-emerald-600"
-                  : "bg-blue-950/90 text-blue-300 border-blue-600"
-              }`}
-            >
-              {isAuthority ? "👑 Authority" : user?.role_id === "teacher" ? "👨‍🏫 Faculty" : "🎓 Student"}
-            </span>
+            <NavList tab={tab} onSelect={navigate} />
+            <div className="mt-auto pt-4">
+              <AccountCard />
+            </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
-            <button
-              onClick={() => navigateTo("signin")}
-              className="px-2 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-center font-medium transition-colors"
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => navigateTo("signup")}
-              className="px-2 py-1.5 rounded bg-indigo-600/80 hover:bg-indigo-600 text-white text-center font-medium transition-colors"
-            >
-              Sign Up
-            </button>
-          </div>
-
-          {hasToken && (
-            <button
-              onClick={handleSignOut}
-              className="w-full mt-2 px-2 py-1 text-[11px] text-rose-400 hover:text-rose-300 text-center transition-colors"
-            >
-              Sign Out
-            </button>
-          )}
         </div>
-      </nav>
+      ) : null}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header Bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm font-medium text-slate-500">
-              Active Context:
-            </span>
-            <span className="text-sm font-semibold text-slate-900 truncate">
-              {user?.name}
-            </span>
-            <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-                isAuthority
-                  ? "bg-purple-100 text-purple-800 border-purple-300 font-semibold"
-                  : user?.role_id === "teacher"
-                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                  : "bg-blue-100 text-blue-800 border-blue-300"
-              }`}
-            >
-              {isAuthority ? "👑 Authority · Full System Access" : user?.role_id === "teacher" ? "👨‍🏫 Teacher" : "🎓 Student (Initial Role)"}
-            </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="chrome-blur sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line px-3 sm:px-5">
+          <div className="lg:hidden">
+            <IconButton icon={Menu} label="Open menu" onClick={() => setDrawer(true)} />
+          </div>
+          <div className="lg:hidden">
+            <Brand />
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
-              <a
-                href="/auth/signin"
-                onClick={(e) => { e.preventDefault(); navigateTo("signin"); }}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2.5 py-1 rounded-md hover:bg-indigo-50 border border-indigo-200 transition-colors"
-              >
-                /auth/signin
-              </a>
-              <a
-                href="/auth/signup"
-                onClick={(e) => { e.preventDefault(); navigateTo("signup"); }}
-                className="text-xs text-slate-700 hover:text-slate-900 font-medium px-2.5 py-1 rounded-md hover:bg-slate-100 border border-slate-200 transition-colors"
-              >
-                /auth/signup
-              </a>
+          <div className="ml-auto flex items-center gap-1">
+            <div className="lg:hidden">
+              <IconButton icon={Search} label="Search" onClick={() => setPalette(true)} />
             </div>
-
-            <button
-              onClick={() => setChatOpen((o) => !o)}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors"
-            >
-              {chatOpen ? "Hide Assistant" : "💬 AI Assistant"}
-            </button>
+            <IconButton
+              icon={theme === "dark" ? Sun : Moon}
+              label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={toggle}
+            />
+            <div className="hidden xl:block">
+              <IconButton
+                icon={chatOpen ? X : Chat}
+                label={chatOpen ? "Hide assistant" : "Show assistant"}
+                onClick={() => setChatOpen((open) => !open)}
+              />
+            </div>
           </div>
         </header>
 
-        {/* Authority Full Access Banner */}
-        {isAuthority && (
-          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-purple-100 px-6 py-2.5 text-xs flex items-center justify-between shadow-inner border-b border-purple-700">
-            <div className="flex items-center gap-2">
-              <span className="text-base">👑</span>
-              <span className="font-semibold">Authority Mode Active:</span>
-              <span>Full administrative CRUD permissions enabled across all campus schedules, rooms, events, announcements, and booking overrides.</span>
-            </div>
-            <span className="bg-purple-800/80 text-purple-200 border border-purple-600/60 px-2 py-0.5 rounded text-[10px] font-mono">
-              ROLE: AUTHORITY
-            </span>
-          </div>
-        )}
-
-        <main className="flex-1 p-6 overflow-x-auto">
-          {tab === "overview" && <Overview />}
-          {tab === "schedules" && <ResourcePage entity="schedules" config={entities.schedules} />}
-          {tab === "rooms" && <Rooms user={user} profile={profile} />}
-          {tab === "events" && <Events user={user} profile={profile} />}
-          {tab === "announcements" && <ResourcePage entity="announcements" config={entities.announcements} />}
-          {tab === "assignments" && <ResourcePage entity="assignments" config={entities.assignments} />}
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-375 flex-1 px-4 py-5 pb-28 sm:px-6 xl:pb-8">
+          <div key={`${tab}-${navKey}`}>{pages[tab]}</div>
         </main>
       </div>
 
-      <ChatPanel profile={profile} open={chatOpen} onToggle={() => setChatOpen((o) => !o)} />
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      <AssistantFab onClick={() => setChatOpen(true)} hidden={chatOpen} />
+      <CommandPalette open={palette} onClose={() => setPalette(false)} onNavigate={navigate} />
       <Toast />
+      <ConfirmHost />
     </div>
   );
 }
 
+/** Nothing is readable without an identity: the whole dashboard is scoped to the signed-in account. */
+function Gate() {
+  const { account } = useCampus();
+  const [view, setView] = useState("signin");
+
+  if (account) return <Shell />;
+
+  const Page = view === "signup" ? SignUp : SignIn;
+  return (
+    <>
+      <Page onNavigate={(target) => setView(target === "signup" ? "signup" : "signin")} onSuccess={() => setView("signin")} />
+      <Toast />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <CampusProvider>
+      <Gate />
+    </CampusProvider>
+  );
+}

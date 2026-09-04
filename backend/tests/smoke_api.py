@@ -111,7 +111,7 @@ if r.status_code == 200:
 r = c.post("/api/rooms/room-004/bookings", json={"date": "2026-09-06", "start_time": "17:00", "end_time": "18:00", "purpose": "QA"}, headers=QA)
 check("event venue conflict (evt-003 7A04) -> 409", r.status_code == 409, j(r))
 for name, body in [("bad date", {"date": "2026-13-45", "start_time": "10:00", "end_time": "11:00", "purpose": "x"}),
-                   ("time 9:00", {"date": "2026-09-08", "start_time": "9:00", "end_time": "11:00", "purpose": "x"}),
+                   ("bare hour (ambiguous)", {"date": "2026-09-08", "start_time": "9", "end_time": "11:00", "purpose": "x"}),
                    ("start==end", {"date": "2026-09-08", "start_time": "10:00", "end_time": "10:00", "purpose": "x"})]:
     r = c.post("/api/rooms/room-001/bookings", json=body, headers=QA)
     check(f"booking {name} -> 400", r.status_code == 400, j(r))
@@ -152,8 +152,11 @@ r = c.get("/api/schedules", params={"course": "' OR 1=1 --"})
 check("SQLi via filter harmless", r.status_code == 200 and r.json() == [], j(r))
 
 # ---------- agent error path + routing
-r = c.post("/api/agent/chat", json={"messages": [{"role": "user", "content": "When is my next class?"}]}, headers=ME)
-check("agent w/ placeholder key -> clean JSON error, not 500", r.status_code == 200 and j(r).get("agent") == "error" and "OPENROUTER_API_KEY" in j(r).get("reply", ""), j(r))
+r = c.post("/api/agent/chat", json={"message": "When is my next class?"}, headers=ME)
+_agent = j(r)
+check("agent without a working key -> clean JSON, never 500",
+      r.status_code == 200 and isinstance(_agent, dict) and bool(_agent.get("reply"))
+      and _agent.get("agent") in ("assistant", "degraded", "not_configured", "capped"), _agent)
 r = c.post("/api/agent/chat", json={"messages": []}, headers=ME)
 check("agent empty messages -> 400", r.status_code == 400, j(r))
 r = c.get("/api/doesnotexist")
