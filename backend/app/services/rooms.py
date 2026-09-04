@@ -146,11 +146,17 @@ def add_booking(room_number: str, data: dict, booked_by: str) -> dict:
     if reason:
         raise DomainError("ROOM_CONFLICT", reason, 409)
     bid = next_id_booking()
-    try:
-        execute("INSERT INTO bookings VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                [bid, room["id"], booked_by, data["date"], start, end, purpose])
-    except psycopg.errors.ExclusionViolation as exc:  # DB-level last line of defense
-        raise DomainError("ROOM_CONFLICT", f"Room {room['room_number']} is already booked in that window", 409) from exc
+    for attempt in range(3):
+        try:
+            execute("INSERT INTO bookings VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                    [bid, room["id"], booked_by, data["date"], start, end, purpose])
+            break
+        except psycopg.errors.ExclusionViolation as exc:  # DB-level last line of defense
+            raise DomainError("ROOM_CONFLICT", f"Room {room['room_number']} is already booked in that window", 409) from exc
+        except psycopg.errors.UniqueViolation:  # a concurrent booking took the id first
+            if attempt == 2:
+                raise
+            bid = next_id_booking()
     sse.publish("rooms", "update", room["id"])
     return q1("SELECT * FROM bookings WHERE booking_id = %s", [bid])
 

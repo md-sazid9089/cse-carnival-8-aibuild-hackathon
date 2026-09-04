@@ -1,0 +1,148 @@
+{
+  "note": "Who takes what. The five provided seed files describe one cohort's campus; this file says which of those courses each student is actually registered for, so a routine belongs to a person instead of to everyone. Adding a student here creates their account on the next boot.",
+  "students": [
+    {
+      "student_id": "20-40532",
+      "name": "Sakibul Hassan",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B1",
+      "elective": "Cyber Security",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4173",
+        "CSE 4174"
+      ]
+    },
+    {
+      "student_id": "20-40511",
+      "name": "Farhan Ahmed",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B2",
+      "elective": "Data Warehousing and Mining",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4141",
+        "CSE 4142"
+      ]
+    },
+    {
+      "student_id": "20-40498",
+      "name": "Tasnia Islam",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B2",
+      "elective": "Cyber Security",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4173",
+        "CSE 4174"
+      ]
+    },
+    {
+      "student_id": "20-40476",
+      "name": "Nusrat Jahan Mim",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B1",
+      "elective": "Data Warehousing and Mining",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4141",
+        "CSE 4142"
+      ]
+    },
+    {
+      "student_id": "20-40523",
+      "name": "Ashiqur Rahman",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B1",
+      "elective": "Cyber Security",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4173",
+        "CSE 4174"
+      ]
+    },
+    {
+      "student_id": "20-40560",
+      "name": "Mehjabin Chowdhury",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B2",
+      "elective": "Data Warehousing and Mining",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4129",
+        "CSE 4130",
+        "CSE 4137",
+        "CSE 4138",
+        "IPE 4111",
+        "CSE 4141",
+        "CSE 4142"
+      ]
+    },
+    {
+      "student_id": "21-41205",
+      "name": "Rafi Hossain",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B1",
+      "elective": "",
+      "note": "Junior repeating three courses with this batch — a deliberately short routine.",
+      "courses": [
+        "CSE 4129",
+        "CSE 4130",
+        "IPE 4111"
+      ]
+    },
+    {
+      "student_id": "21-41188",
+      "name": "Shafayet Karim",
+      "department": "CSE",
+      "section": "B",
+      "lab_group": "B2",
+      "elective": "",
+      "note": "Reduced load after a semester drop.",
+      "courses": [
+        "CSE 4113",
+        "CSE 4114",
+        "CSE 4137",
+        "CSE 4138"
+      ]
+    }
+  ]
+}

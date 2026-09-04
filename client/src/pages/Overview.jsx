@@ -63,7 +63,7 @@ function StatTile({ icon: Icon, label, value, onClick }) {
 export default function Overview({ onNavigate }) {
   const { today, weekday, nowTime, profile, timezone } = useCampus();
 
-  const schedules = useApi("/api/schedules");
+  const schedules = useApi("/api/schedules?mine=1");
   const events = useApi("/api/events");
   const announcements = useApi("/api/announcements?include_expired=false");
   const assignments = useApi("/api/assignments");
@@ -251,7 +251,7 @@ export default function Overview({ onNavigate }) {
         />
         <StatTile
           icon={Calendar}
-          label={`Classes on ${weekday}`}
+          label={`Your classes on ${weekday}`}
           value={todaysClasses.length}
           onClick={() => onNavigate("schedules")}
         />

@@ -11,6 +11,14 @@ def _load(name: str):
     return json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
 
 
+def _enrollments() -> list[dict]:
+    """Who takes what. Optional: without the file every student sees the whole cohort's timetable."""
+    path = DATA_DIR / "enrollments.json"
+    if not path.exists():
+        return []
+    return [s for s in _load("enrollments.json").get("students", []) if s.get("student_id")]
+
+
 def _courses_from(schedules: list[dict], assignments: list[dict]) -> list[tuple]:
     titles: dict[str, str] = {}
     for s in schedules:
@@ -21,6 +29,36 @@ def _courses_from(schedules: list[dict], assignments: list[dict]) -> list[tuple]
         (code, title, code.split(" ")[0], "lab" if title.lower().endswith("lab") else "theory")
         for code, title in titles.items()
     ]
+
+
+def _enroll_listed_students(conn) -> None:
+    """data/enrollments.json is authoritative for the students it names.
+
+    Their list replaces whatever they were enrolled in before, so a routine reflects the file
+    rather than an earlier boot. Students it does not name fall back to the whole cohort.
+    """
+    for student in _enrollments():
+        sid = str(student["student_id"]).strip()
+        courses = [str(c).strip() for c in student.get("courses", []) if str(c).strip()]
+        if not sid or not courses:
+            continue
+        section = str(student.get("section") or "B").strip()
+        lab_group = str(student.get("lab_group") or section).strip()
+        conn.execute(
+            """DELETE FROM course_enrollments
+               WHERE role_in_course = 'student' AND course_code <> ALL(%s)
+                 AND user_id = (SELECT id FROM users WHERE student_id = %s)""",
+            [courses, sid],
+        )
+        for code in courses:
+            conn.execute(
+                """INSERT INTO course_enrollments (user_id, course_code, section, role_in_course)
+                   SELECT u.id, c.code, CASE WHEN c.kind = 'lab' THEN %s ELSE %s END, 'student'
+                   FROM users u, courses c
+                   WHERE u.student_id = %s AND c.code = %s
+                   ON CONFLICT (user_id, course_code) DO UPDATE SET section = EXCLUDED.section""",
+                [lab_group, section, sid, code],
+            )
 
 
 def link_identities() -> None:
@@ -36,6 +74,7 @@ def link_identities() -> None:
                FROM schedules s JOIN users u ON u.name = s.instructor
                ON CONFLICT DO NOTHING"""
         )
+        _enroll_listed_students(conn)
         conn.execute(
             """INSERT INTO course_enrollments (user_id, course_code, section, role_in_course)
                SELECT u.id, c.code,
@@ -43,6 +82,7 @@ def link_identities() -> None:
                       'student'
                FROM users u CROSS JOIN courses c
                WHERE u.role_id = 'student'
+                 AND NOT EXISTS (SELECT 1 FROM course_enrollments e WHERE e.user_id = u.id)
                ON CONFLICT DO NOTHING"""
         )
         conn.execute(
@@ -66,25 +106,32 @@ def link_identities() -> None:
         )
 
 
-def _people_from_data() -> list[tuple[str, str]]:
-    """Every (student_id, name) the seed data names as an event registrant.
+def _people_from_data() -> list[dict]:
+    """Every person the seed data names: enrolled students and event registrants.
 
-    Accounts are derived from the dataset rather than listed here, so editing
-    data/events.json is the only place a person is introduced.
+    Accounts are derived from the dataset rather than listed here, so data/enrollments.json
+    and data/events.json are the only places a person is introduced.
     """
-    people: dict[str, str] = {}
+    people: dict[str, dict] = {}
+    for student in _enrollments():
+        sid = str(student["student_id"]).strip()
+        name = str(student.get("name", "")).strip()
+        if sid and name:
+            people[sid] = {"student_id": sid, "name": name,
+                           "department": str(student.get("department") or DEPARTMENT).strip()}
     for event in _load("events.json"):
         for reg in event.get("registrations", []):
             sid = str(reg.get("student_id", "")).strip()
             name = str(reg.get("name", "")).strip()
             if sid and name:
-                people.setdefault(sid, name)
-    return sorted(people.items())
+                people.setdefault(sid, {"student_id": sid, "name": name, "department": DEPARTMENT})
+    return [people[sid] for sid in sorted(people)]
 
 
-def _email_for(name: str) -> str:
+def _email_for(name: str, student_id: str, department: str) -> str:
+    """AUST addresses are name.department.studentid@domain — the same shape sign-up requires."""
     parts = [p for p in re.split(r"[^A-Za-z]+", name.lower()) if p]
-    return f"{'.'.join(parts) or 'student'}@{EMAIL_DOMAIN}"
+    return f"{'.'.join(parts) or 'student'}.{department.lower()}.{student_id}@{EMAIL_DOMAIN}"
 
 
 def seed_users() -> None:
@@ -99,15 +146,18 @@ def seed_users() -> None:
     pw_hash = hash_password(SEED_USER_PASSWORD) if SEED_USER_PASSWORD else None
 
     with pool.connection() as conn:
-        for student_id, name in _people_from_data():
+        for person in _people_from_data():
+            sid, name, dept = person["student_id"], person["name"], person["department"]
             conn.execute(
                 """INSERT INTO users (id, role_id, student_id, name, email, department, status, password_hash)
                    VALUES (%s, 'student', %s, %s, %s, %s, 'active', %s)
                    ON CONFLICT (student_id) DO UPDATE SET
                        name = EXCLUDED.name,
+                       email = EXCLUDED.email,
+                       department = EXCLUDED.department,
                        status = EXCLUDED.status,
                        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)""",
-                [f"usr-{student_id}", student_id, name, _email_for(name), DEPARTMENT, pw_hash],
+                [f"usr-{sid}", sid, name, _email_for(name, sid, dept), dept, pw_hash],
             )
     link_identities()
 

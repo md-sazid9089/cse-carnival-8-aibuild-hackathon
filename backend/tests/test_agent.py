@@ -152,12 +152,13 @@ check("gateway: pool recovers on the next turn after an upstream throttle",
       out["message"]["content"] == "fallback answer" and fake.calls[-1][1] == "model-a",
       fake.calls)
 
-# An account-level cap has no short Retry-After: that one really does park the key.
+# An account-level cap is really per model: the key keeps working on the rest of the chain.
 gw, fake = make_gateway([(429, {"error": {"message": "Rate limit exceeded: free-models-per-day"}}),
                          (200, _msg("other key"))])
 out = run(gw.complete([{"role": "user", "content": "x"}]))
-check("gateway: daily cap 429 parks the key and cycles",
-      out["message"]["content"] == "other key" and not gw.keys[0].available(),
+check("gateway: daily cap 429 costs the key that model only, and cycles",
+      out["message"]["content"] == "other key"
+      and not gw.keys[0].available_for("model-a") and gw.keys[0].available(),
       [k.limit_status() for k in gw.keys])
 
 # OpenRouter sends x-ratelimit-reset as an absolute epoch in MILLISECONDS. Read as a delta it looked
@@ -200,7 +201,12 @@ gw, _ = make_gateway([(200, _msg("x"))])
 ks = gw.keys[0]
 for _ in range(config.OPENROUTER_RPD_PER_KEY):
     ks.note_request()
-check("gateway: daily bucket blocks a spent key", not ks.available(), ks.used_today)
+ks.minute_start = time.monotonic() - 61  # isolate the assertion to the daily budget
+check("gateway: the advisory daily budget warns instead of taking a key offline",
+      ks.available() and ks.limit_status() == "warning", (ks.used_today, ks.limit_status()))
+plan = gw._attempts()
+check("gateway: an over-budget key is tried last, not first",
+      plan and plan[0][1] is not ks, [k.index for _, k in plan])
 check("gateway: health masks counts",
       set(gw.health()["providers"][0]) == {"name", "keys", "status", "limit_status"}, gw.health())
 check("gateway: health has no key material",

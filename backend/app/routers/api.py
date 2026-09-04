@@ -93,8 +93,14 @@ def auth_me(who: dict = Depends(current_user)):
 
 # ---- schedules ----
 @router.get("/schedules")
-def schedules_list(day: str | None = None, course: str | None = None, instructor: str | None = None):
-    return schedules.list_schedules(day, course, instructor)
+def schedules_list(day: str | None = None, course: str | None = None, instructor: str | None = None,
+                   mine: bool = False, who: dict = Depends(current_user)):
+    return schedules.list_schedules(day, course, instructor, who["id"] if mine else None)
+
+
+@router.get("/schedules/my-courses")
+def schedules_my_courses(who: dict = Depends(current_user)):
+    return schedules.my_courses(who["id"])
 
 
 @router.post("/schedules")

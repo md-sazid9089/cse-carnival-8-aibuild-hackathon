@@ -9,6 +9,7 @@ import time
 
 from ..config import AUTH_SECRET, AUTH_TOKEN_TTL_S, EMAIL_DOMAIN
 from ..db import execute, q, q1
+from . import schedules
 from .common import DomainError
 
 ITERATIONS = 100_000
@@ -148,6 +149,8 @@ def sign_up(name: str, email: str, password: str, student_id: str | None = None,
            VALUES (%s, 'student', %s, %s, %s, %s, 'active', %s)""",
         [user_id, student_id, name, email, department, hashed],
     )
+    # No registration data exists for someone who just arrived, so they start on the full cohort load.
+    schedules.enroll_in_all_courses(user_id)
 
     user = q1(
         "SELECT id, role_id, student_id, employee_id, name, email, department, status, created_at FROM users WHERE id = %s",

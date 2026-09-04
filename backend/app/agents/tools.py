@@ -41,8 +41,11 @@ READ_TOOLS = [
         _p({}, [])),
     _fn("get_next_class", "The user's next upcoming class from campus time (week is Sunday-Thursday).",
         _p({}, [])),
-    _fn("list_schedules", "Class timetable, optionally filtered by weekday and/or course code.",
-        _p({"day": {"type": "string", "enum": DAYS}, "course": {"type": "string"}}, [])),
+    _fn("list_schedules",
+        "Class timetable, optionally filtered by weekday and/or course code. Set mine=true for the "
+        "user's own routine (only the courses they are enrolled in); leave it off for the whole cohort.",
+        _p({"day": {"type": "string", "enum": DAYS}, "course": {"type": "string"},
+            "mine": {"type": "boolean"}}, [])),
     _fn("list_announcements", "Campus announcements (active ones by default), optionally by priority.",
         _p({"priority": {"type": "string", "enum": announcements.PRIORITIES},
             "include_expired": {"type": "boolean"}}, [])),
@@ -144,13 +147,14 @@ def _err(reason: str, detail: str) -> dict:
     return {"ok": False, "reason": reason, "detail": detail, "summary": f"{reason}: {detail}"}
 
 
-def _next_class() -> dict:
+def _next_class(profile: dict) -> dict:
     now = now_local()
+    user_id = profile.get("id")
     for offset in range(0, 9):
         day = now + timedelta(days=offset)
         if day.strftime("%A") not in DAYS:
             continue
-        todays = schedules.list_schedules(day=day.strftime("%A"))
+        todays = schedules.list_schedules(day=day.strftime("%A"), user_id=user_id)
         if offset == 0:
             todays = [s for s in todays if s["start_time"] > now.strftime("%H:%M")]
         if todays:
@@ -163,12 +167,14 @@ def _next_class() -> dict:
 def _briefing(profile: dict) -> dict:
     now = now_local()
     today_name = now.strftime("%A")
+    user_id = profile.get("id")
     notices = announcements.list_announcements(include_expired=False)
     return {
         "campus_time": now.strftime("%Y-%m-%d %H:%M"),
         "today": today_name,
         "is_weekend": today_name not in DAYS,
-        "todays_classes": schedules.list_schedules(day=today_name) if today_name in DAYS else [],
+        "todays_classes": schedules.list_schedules(day=today_name, user_id=user_id) if today_name in DAYS else [],
+        "my_courses": [c["course_code"] for c in schedules.my_courses(user_id)] if user_id else [],
         "high_priority_announcements": [a for a in notices if a["priority"] == "high"][:5],
         "assignments_due_7_days": assignments.list_assignments(due_within_days=7),
         "my_bookings": rooms.list_my_bookings(profile["name"]),
@@ -196,13 +202,16 @@ def _run(name: str, args: dict, ctx: dict) -> dict:
                       f"{len(b['assignments_due_7_days'])} due within 7 days, "
                       f"{len(b['high_priority_announcements'])} high-priority notices")
     if name == "get_next_class":
-        d = _next_class()
+        d = _next_class(profile)
         nc = d["next_class"]
         return _ok(d, f"next class {nc['course']} on {nc['date']} at {nc['start_time']} in {nc['room']}"
                    if nc else "no upcoming class found")
     if name == "list_schedules":
-        rows = schedules.list_schedules(args.get("day"), args.get("course"))
-        return _ok(_cap(rows, "Cross-check announcements for reschedules."), f"{len(rows)} classes")
+        mine = bool(args.get("mine")) and profile.get("id")
+        rows = schedules.list_schedules(args.get("day"), args.get("course"),
+                                        user_id=profile["id"] if mine else None)
+        return _ok(_cap(rows, "Cross-check announcements for reschedules."),
+                   f"{len(rows)} classes{' you are enrolled in' if mine else ''}")
     if name == "list_announcements":
         rows = announcements.list_announcements(args.get("priority"), bool(args.get("include_expired", False)))
         return _ok(_cap(rows), f"{len(rows)} announcements")

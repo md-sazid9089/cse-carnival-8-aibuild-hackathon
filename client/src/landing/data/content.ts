@@ -14,10 +14,10 @@ import {
 } from "lucide-react";
 
 export const NAV_LINKS = [
-  { label: "Product", href: "#product" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
+  { label: "Problem", href: "#problem" },
   { label: "AI Agent", href: "#ai-agent" },
+  { label: "Live Data", href: "#realtime" },
+  { label: "Trust", href: "#trust" },
 ] as const;
 
 export const APP_PATH = "/overview";
@@ -209,9 +209,9 @@ export const RELIABILITY = [
 
 export const FOOTER_LINKS = [
   { label: "Product", href: "#product" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
   { label: "AI Agent", href: "#ai-agent" },
+  { label: "Live Data", href: "#realtime" },
+  { label: "Trust", href: "#trust" },
   { label: "GitHub", href: "https://github.com", external: true },
   { label: "Contact", href: "mailto:hello@campusos.app" },
 ] as const;

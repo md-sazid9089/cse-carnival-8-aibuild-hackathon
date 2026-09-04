@@ -6,7 +6,9 @@ from .courses import ensure_course
 FIELDS = ["course", "title", "day", "start_time", "end_time", "room", "instructor", "section"]
 
 
-def list_schedules(day: str | None = None, course: str | None = None, instructor: str | None = None) -> list[dict]:
+def list_schedules(day: str | None = None, course: str | None = None, instructor: str | None = None,
+                   user_id: str | None = None) -> list[dict]:
+    """The timetable. With user_id, only the classes that user is enrolled in or teaches."""
     sql, params = "SELECT * FROM schedules", []
     conds = []
     if day:
@@ -15,9 +17,34 @@ def list_schedules(day: str | None = None, course: str | None = None, instructor
         conds.append("course ILIKE %s"); params.append(f"%{course}%")
     if instructor:
         conds.append("instructor ILIKE %s"); params.append(f"%{instructor}%")
+    if user_id:
+        conds.append("course IN (SELECT course_code FROM course_enrollments WHERE user_id = %s)")
+        params.append(user_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     return q(sql + " ORDER BY array_position(%s::text[], day), start_time", params + [DAYS])
+
+
+def my_courses(user_id: str) -> list[dict]:
+    return q(
+        """SELECT e.course_code, e.section, e.role_in_course, c.title, c.kind
+           FROM course_enrollments e LEFT JOIN courses c ON c.code = e.course_code
+           WHERE e.user_id = %s ORDER BY e.course_code""",
+        [user_id],
+    )
+
+
+def enroll_in_all_courses(user_id: str) -> None:
+    """Everything the cohort runs — the starting point for an account with no registration data."""
+    execute(
+        """INSERT INTO course_enrollments (user_id, course_code, section, role_in_course)
+           SELECT %s, c.code,
+                  COALESCE((SELECT s.section FROM schedules s WHERE s.course = c.code LIMIT 1), 'B'),
+                  'student'
+           FROM courses c
+           ON CONFLICT DO NOTHING""",
+        [user_id],
+    )
 
 
 def get_schedule(sid: str) -> dict:

@@ -56,6 +56,9 @@ class KeyState:
     used_minute: int = 0
     blocked_until: float = 0.0  # monotonic; set by 429 Retry-After
     exhausted_day: date | None = None
+    # OpenRouter calls the free cap "account-level", but other free models keep answering on the
+    # same key, so it is tracked per model instead of writing the whole key off for the day.
+    exhausted_models: dict[str, date] = field(default_factory=dict)
 
     def _roll(self) -> None:
         today = datetime.now(timezone.utc).date()
@@ -63,6 +66,7 @@ class KeyState:
             self.day, self.used_today = today, 0
             if self.exhausted_day and self.exhausted_day != today:
                 self.exhausted_day = None
+            self.exhausted_models = {m: d for m, d in self.exhausted_models.items() if d == today}
         now = time.monotonic()
         if now - self.minute_start >= 60:
             self.minute_start, self.used_minute = now, 0
@@ -73,20 +77,25 @@ class KeyState:
             return False
         if time.monotonic() < self.blocked_until:
             return False
-        if self.used_today >= config.OPENROUTER_RPD_PER_KEY:
-            return False
+        # the daily budget is an estimate of someone else's limit, so it only reorders keys
         return self.used_minute < config.OPENROUTER_RPM_PER_KEY
+
+    def available_for(self, model: str) -> bool:
+        return self.available() and self.exhausted_models.get(model) != self.day
 
     def note_request(self) -> None:
         self._roll()
         self.used_today += 1
         self.used_minute += 1
 
-    def note_429(self, retry_after: float | None, daily: bool = False) -> None:
-        """Only an account-level daily cap parks the key until tomorrow; anything else is a cooldown."""
+    def note_429(self, retry_after: float | None, daily: bool = False, model: str | None = None) -> None:
+        """A daily cap costs the key that model for the rest of the day; anything else is a cooldown."""
         self._roll()
         if daily:
-            self.exhausted_day = self.day
+            if model:
+                self.exhausted_models[model] = self.day
+            else:
+                self.exhausted_day = self.day
             return
         self.blocked_until = time.monotonic() + min(max(retry_after or 60.0, 5.0), 300.0)
 
@@ -218,12 +227,12 @@ class Gateway:
         A free model that is busy upstream answers with a short Retry-After and names the
         provider; that throttles the *model* for everyone, so parking the key would burn the
         whole pool on a five-second hiccup. A per-minute limit is the key's, but only for a
-        minute. Only an account-level daily cap parks the key for the rest of the day.
+        minute. A daily cap costs this key that one model for the rest of the day.
         """
         retry_after = _retry_after(res)
         detail = _error_detail(res)
         if KEY_DAILY_RE.search(detail):
-            ks.note_429(retry_after, daily=True)
+            ks.note_429(retry_after, daily=True, model=model)
             return
         if KEY_MINUTE_RE.search(detail):
             ks.note_429(retry_after)
@@ -256,9 +265,9 @@ class Gateway:
         for model in (models or self.models):
             if not self.breakers.setdefault(model, Breaker()).closed():
                 continue
-            for offset in range(len(self.keys)):
-                ks = self.keys[(start + offset) % len(self.keys)]
-                if ks.available():
+            rotation = [self.keys[(start + offset) % len(self.keys)] for offset in range(len(self.keys))]
+            for ks in sorted(rotation, key=lambda k: k.used_today >= config.OPENROUTER_RPD_PER_KEY):
+                if ks.available_for(model):
                     plan.append((model, ks))
         return plan
 
